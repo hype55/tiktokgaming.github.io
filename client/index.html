@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <title>Street Race!</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Arial Black', 'Arial', sans-serif;
+    }
+    #scaleWrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1080px;
+      height: 1920px;
+      transform-origin: top left;
+    }
+    #gameCanvas {
+      position: absolute;
+      top: 0; left: 0;
+      display: block;
+    }
+    #ui {
+      position: absolute;
+      top: 0; left: 0;
+      width: 1080px;
+      height: 1920px;
+      pointer-events: none;
+    }
+
+    /* Title — hidden, replaced by top bars */
+    #title   { display: none; }
+    #subtitle { display: none; }
+
+    /* Status badge */
+    #statusBadge {
+      position: absolute;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 22px;
+      font-weight: bold;
+      padding: 8px 22px;
+      border-radius: 10px;
+      border: 2px solid #555;
+      background: rgba(0,0,0,0.7);
+      color: #AAA;
+      white-space: normal;
+      max-width: 900px;
+      text-align: center;
+      word-break: break-all;
+      transition: color 0.4s, border-color 0.4s;
+    }
+    #statusBadge.live  { color: #00FF88; border-color: #00FF88; box-shadow: 0 0 10px rgba(0,255,136,0.35); }
+    #statusBadge.demo  { color: #FF9900; border-color: #FF9900; box-shadow: 0 0 10px rgba(255,153,0,0.35); }
+    #statusBadge.error { color: #FF4444; border-color: #FF4444; box-shadow: 0 0 10px rgba(255,68,68,0.35); }
+
+    /* Time of day badge — hidden */
+    #timeOfDay { display: none; }
+
+    /* Username input overlay */
+    #usernameOverlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #usernameOverlay h2 {
+      color: #FFD700;
+      font-size: 42px;
+      font-weight: 900;
+      text-shadow: 0 0 20px #FF6600;
+      margin-bottom: 10px;
+    }
+    #usernameOverlay p {
+      color: #AAA;
+      font-size: 20px;
+      margin-bottom: 28px;
+    }
+    #usernameInput {
+      font-size: 28px;
+      padding: 14px 22px;
+      border-radius: 12px;
+      border: 3px solid #FFD700;
+      background: #111;
+      color: #FFF;
+      text-align: center;
+      width: 420px;
+      outline: none;
+    }
+    #usernameInput:focus { border-color: #00FF88; }
+    #usernameBtn {
+      margin-top: 18px;
+      font-size: 24px;
+      font-weight: bold;
+      padding: 14px 48px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(90deg, #FF6600, #FFD700);
+      color: #000;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    #usernameBtn:hover { transform: scale(1.04); }
+
+    /* ── TOP BARS ── */
+    #topBars {
+      position: absolute;
+      top: 60px; left: 80px;
+      width: 920px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .top-bar-row {
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 12px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .top-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 1px 1px 6px rgba(0,0,0,0.8);
+      letter-spacing: 1px;
+    }
+    .top-bar-track {
+      width: 100%;
+      height: 32px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    #progressBarInner {
+      height: 100%;
+      background: linear-gradient(90deg, #00FF88 0%, #AAFF00 25%, #FFD700 50%, #FF8800 75%, #FF2200 100%);
+      border-radius: 16px;
+      width: 0%;
+      transition: width 0.5s ease;
+      box-shadow: 0 0 14px rgba(255,180,0,0.7);
+    }
+
+    /* Leaderboard */
+    #leaderboard {
+      position: absolute;
+      top: 310px;
+      left: 80px;
+      background: transparent;
+      padding: 0;
+      width: 520px;
+    }
+    #leaderboard h3 {
+      color: #fff;
+      font-size: 40px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      letter-spacing: 3px;
+      text-shadow: 0 0 16px rgba(255,255,255,0.3);
+    }
+    .lb-item {
+      display: flex;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .lb-item:last-child { border-bottom: none; }
+    .lb-rank { width: 54px; font-weight: bold; font-size: 36px; text-align:center; flex-shrink:0; }
+    .lb-rank.rank-1 { color: #FFD700; font-size: 46px; }
+    .lb-rank.rank-2 { color: #C0C0C0; font-size: 42px; }
+    .lb-rank.rank-3 { color: #CD7F32; font-size: 40px; }
+    .lb-rank.rank-other { color: #888; font-size: 34px; }
+    .lb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 34px; font-weight: 700; color: #fff; }
+    .lb-pts  { color: #fff; font-weight: 900; font-size: 38px; white-space: nowrap; padding: 0 8px; }
+    .lb-icon { display: flex; align-items: center; flex-shrink: 0; }
+
+    /* Info panel — no card, just text */
+    #infoPanel {
+      position: absolute;
+      top: 310px;
+      right: 80px;
+      background: transparent;
+      padding: 0;
+      width: 280px;
+    }
+    .info-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+    }
+    .info-icon { font-size: 48px; width: 58px; text-align: center; flex-shrink:0; }
+    .info-desc { flex: 1; color: rgba(255,255,255,0.9); font-size: 34px; font-weight: 700; padding: 0 6px; }
+    .info-val  { color: #FFD700; font-weight: 900; font-size: 38px; white-space: nowrap; }
+
+    /* Fixed UI buttons — small, bottom right */
+    .ui-btn {
+      position: fixed;
+      z-index: 99999;
+      width: 24px;
+      height: 24px;
+      font-size: 11px;
+      background: rgba(0,0,0,0.5);
+      color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .ui-btn:hover { background: rgba(255,255,255,0.15); }
+    #fsBtn    { top: calc(50% + 34px); right: 10px; }
+    #musicBtn { top: calc(50% - 12px); right: 10px; }
+    #backBtn  { top: calc(50% - 58px); right: 10px; }
+    #musicBtn.on { border-color: #00FF88; color: #00FF88; }
+
+    /* Event announcement overlay */
+    #eventAnnouncement {
+      position: absolute;
+      top: 42%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      font-size: 88px;
+      font-weight: 900;
+      color: #FF4444;
+      text-shadow: 0 0 30px currentColor, 0 0 60px currentColor, 3px 3px 0 #000;
+      letter-spacing: 4px;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 200;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+  </style>
+</head>
+<body>
+<button id="backBtn"  class="ui-btn" title="Back">⌂</button>
+<button id="musicBtn" class="ui-btn" title="Music">🎵</button>
+<button id="fsBtn"    class="ui-btn" title="Fullscreen">⛶</button>
+<div id="scaleWrapper">
+  <canvas id="gameCanvas" width="1080" height="1920"></canvas>
+  <!-- Nickname labels layer — above 3D, no fog/depth -->
+  <canvas id="nameCanvas" width="1080" height="1920" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+
+  <!-- Username entry overlay — shown only when no username in URL -->
+  <div id="usernameOverlay" style="display:none">
+    <h2>🏁 STREET RACE! 🏁</h2>
+    <p>Enter your TikTok username to connect to the stream</p>
+    <input id="usernameInput" type="text" placeholder="@your_username" autocomplete="off" spellcheck="false">
+    <button id="usernameBtn">▶ START</button>
+  </div>
+
+  <div id="ui">
+    <!-- Map progress bar -->
+    <div id="topBars">
+      <div class="top-bar-row">
+        <div class="top-bar-header">
+          <span>🗺️ КАРТА</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="top-bar-track"><div id="progressBarInner"></div></div>
+      </div>
+    </div>
+
+    <div id="timeOfDay">🌅 MORNING</div>
+    <div id="statusBadge" style="display:none">⏳ Connecting…</div>
+    <div id="timeSpeedBadge" style="display:none">⚡</div>
+
+    <div id="leaderboard">
+      <h3>🏆 ТОП ДОНАТОВ</h3>
+      <div id="leaderboardList"></div>
+    </div>
+
+    <div id="infoPanel">
+      <div class="info-row">
+        <span class="info-icon">❤️</span>
+        <span class="info-desc">лайк</span>
+        <span class="info-val">= 1м</span>
+      </div>
+      <div class="info-row">
+        <span class="info-icon">🎁</span>
+        <span class="info-desc">монета</span>
+        <span class="info-val">= 100м</span>
+      </div>
+      <div class="info-row">
+        <span class="info-icon">💥</span>
+        <span class="info-desc">катастрофа</span>
+        <span class="info-val">~30с</span>
+      </div>
+    </div>
+
+    <!-- Event announcement -->
+    <div id="eventAnnouncement"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="websocket.js?v=20250311_22"></script>
+  <script src="leaderboard.js?v=20250311_22"></script>
+  <script src="characters.js?v=20250311_22"></script>
+  <script src="voice.js?v=20250311_22"></script>
+  <script src="game.js?v=20250311_22"></script>
+  <script src="music.js?v=20250311_22"></script>
+  <script src="devtools.js?v=20250311_22"></script>
+</div>
+
+<script>
+  (function() {
+    var wrapper = document.getElementById('scaleWrapper');
+
+    var pinchScale  = 1;
+    var pinchOffset = { x: 0, y: 0 };
+
+    function resize() { applyTransform(); }
+    function applyTransform() {
+      var w = document.documentElement.clientWidth  || window.innerWidth;
+      var h = document.documentElement.clientHeight || window.innerHeight;
+      var baseScale  = Math.min(w / 1080, h / 1920);
+      var totalScale = baseScale * pinchScale;
+      var cx = (w - 1080 * totalScale) / 2 + pinchOffset.x;
+      var cy = (h - 1920 * totalScale) / 2 + pinchOffset.y;
+      wrapper.style.transform = 'translate(' + cx + 'px, ' + cy + 'px) scale(' + totalScale + ')';
+    }
+
+    window.addEventListener('resize', resize);
+
+    window.addEventListener('orientationchange', function() {
+      setTimeout(resize, 300);
+    });
+
+    resize();
+
+    // ── Pinch-to-zoom ─────────────────────────────────────────────────────────
+    var lastDist    = 0;
+    var lastMid     = { x: 0, y: 0 };
+    var isDragging  = false;
+    var dragStart   = { x: 0, y: 0 };
+    var MIN_ZOOM = 0.5, MAX_ZOOM = 3.0;
+
+    function dist(t1, t2) {
+      var dx = t1.clientX - t2.clientX;
+      var dy = t1.clientY - t2.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    function mid(t1, t2) {
+      return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+    }
+
+    var wasPinching = false;
+
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        wasPinching = true;
+        lastDist = dist(e.touches[0], e.touches[1]);
+        lastMid  = mid(e.touches[0], e.touches[1]);
+        isDragging = false;
+      } else if (e.touches.length === 1 && pinchScale > 1.05) {
+        isDragging = true;
+        dragStart  = { x: e.touches[0].clientX - pinchOffset.x, y: e.touches[0].clientY - pinchOffset.y };
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 2) {
+        isDragging = false;
+        var d = dist(e.touches[0], e.touches[1]);
+        var m = mid(e.touches[0], e.touches[1]);
+        var delta = d / lastDist;
+        pinchScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchScale * delta));
+        pinchOffset.x += (m.x - lastMid.x);
+        pinchOffset.y += (m.y - lastMid.y);
+        lastDist = d;
+        lastMid  = m;
+        applyTransform();
+      } else if (e.touches.length === 1 && isDragging) {
+        pinchOffset.x = e.touches[0].clientX - dragStart.x;
+        pinchOffset.y = e.touches[0].clientY - dragStart.y;
+        applyTransform();
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+      if (e.touches.length === 0) {
+        isDragging = false;
+        // Сбросить флаг пинча только когда все пальцы убраны
+        // НЕ сбрасываем масштаб автоматически — фиксируем текущее положение
+        setTimeout(function() { wasPinching = false; }, 400);
+      }
+    }, { passive: true });
+
+    // Back button — выход в остальные игры
+    var backBtn = document.getElementById('backBtn');
+    backBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      window.location.href = '/';
+    });
+
+    // Music button
+    var musicBtn = document.getElementById('musicBtn');
+    musicBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var on = Music.toggle();
+      musicBtn.classList.toggle('on', on);
+      musicBtn.textContent = on ? '🔊' : '🎵';
+    });
+
+    // Fullscreen button
+    var fsBtn = document.getElementById('fsBtn');
+
+    function isFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+    }
+
+    function enterFullscreen() {
+      var el = document.documentElement;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req) {
+        req.call(el).then(function() {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(function(){});
+          }
+          setTimeout(resize, 300);
+        }).catch(function(e) {
+          console.log('Fullscreen error:', e);
+        });
+      }
+    }
+
+    function exitFullscreen() {
+      var ex = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+      if (ex) ex.call(document);
+    }
+
+    fsBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (isFullscreen()) {
+        exitFullscreen();
+      } else {
+        enterFullscreen();
+      }
+    });
+
+    function updateFsBtn() {
+      fsBtn.textContent = isFullscreen() ? '✕' : '⛶';
+      setTimeout(resize, 300);
+    }
+
+    document.addEventListener('fullscreenchange', updateFsBtn);
+    document.addEventListener('webkitfullscreenchange', updateFsBtn);
+    document.addEventListener('mozfullscreenchange', updateFsBtn);
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Взаимки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gap: 12px;
+    --radius: 16px;
+    --panel: rgba(14,17,26,0.74);
+    --panel-soft: rgba(14,17,26,0.58);
+    --border: rgba(255,255,255,0.10);
+    --text: #f3f5fb;
+    --text-dim: rgba(243,245,251,0.62);
+    --text-faint: rgba(243,245,251,0.38);
+    --gold: #ffcf6b;
+    --gold-deep: #e0a83a;
+    --silver: #d7dcea;
+    --bronze: #e2a06a;
+    --accent: #8f7bff;
+    --accent2: #6a8bff;
+    --pink: #ff6f9c;
+    --green: #57d9a3;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:
+      radial-gradient(circle at 25% 12%, rgba(143,123,255,0.30), transparent 55%),
+      radial-gradient(circle at 85% 88%, rgba(106,139,255,0.24), transparent 50%),
+      linear-gradient(165deg, rgba(12,13,22,0.88) 0%, rgba(9,10,17,0.92) 55%, rgba(6,7,12,0.95) 100%);
+    font-family:'Manrope','Segoe UI',system-ui,sans-serif;
+    color: var(--text);
+    overflow: hidden;
+  }
+  img{ max-width:none; }
+
+  #stageWrap{
+    position:fixed; inset:0;
+  }
+  #stage{
+    position:absolute; top:50%; left:50%;
+    width:600px; height:1000px;
+    transform-origin:center center;
+    display:flex; flex-direction:column;
+    gap: var(--gap);
+    padding: 14px 14px 10px;
+  }
+
+  /* ── Top bar ───────────────────────────────────────────── */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 6px 4px;
+  }
+  .brand{
+    font-weight:800; font-size:44px; letter-spacing:0.5px;
+    display:flex; align-items:center; gap:8px;
+    color:#fff; text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  }
+  .brand .dotpulse{
+    width:9px; height:9px; border-radius:50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(87,217,163,0.6);
+    animation: dotpulse 2.2s infinite;
+  }
+  @keyframes dotpulse{
+    0%{ box-shadow: 0 0 0 0 rgba(87,217,163,0.55); }
+    70%{ box-shadow: 0 0 0 8px rgba(87,217,163,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(87,217,163,0); }
+  }
+  /* ── Кнопки справа (домой/музыка/полный экран) — как в остальных играх:
+     фиксированы к вьюпорту, не масштабируются вместе со сценой ────────── */
+  .ui-btn{
+    position:fixed; z-index:99999; width:26px; height:26px; font-size:12px;
+    background:rgba(0,0,0,0.55); color:rgba(255,255,255,0.55);
+    border:1px solid rgba(255,255,255,0.2); border-radius:6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #backBtn{ top: calc(50% - 49px); right:10px; }
+  #musicBtn{ top: calc(50%); right:10px; }
+  #fsBtn{ top: calc(50% + 49px); right:10px; }
+  .connBadge{
+    font-size:22px; padding:3px 9px; border-radius:8px;
+    background: rgba(255,255,255,0.08); color: var(--text-dim);
+    font-weight:600;
+  }
+  .connBadge[hidden]{ display:none; }
+
+  /* ── TOP3 row ──────────────────────────────────────────── */
+  .top3{
+    order:1; display:flex; align-items:flex-end; gap:8px;
+  }
+
+  /* ── Ведущая (внизу, под рейтингами, без карточки — просто крупнее
+     поверх прозрачного фона). Позиция задаётся через flex `order` на
+     #stage — .hostCard физически остаётся первым в DOM, но визуально
+     едет вниз. ──────────────────────────────────────────────────── */
+  .hostCard{
+    order:4;
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:10px; min-height:0;
+  }
+  .host-avatar{
+    position:relative; width:270px; height:270px;
+    animation: hostBob 4.2s ease-in-out infinite;
+  }
+  /* #host сам является .host-avatar (id и class на одном узле) — переопределяем
+     анимацию на нём же, а не на несуществующем потомке */
+  #host[data-state="excited"]{ animation: hostBobExcited 0.7s ease-in-out infinite; }
+  #host[data-state="waiting"]{ animation: hostBob 5.4s ease-in-out infinite; }
+  @keyframes hostBob{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-2px) rotate(-1deg); }
+  }
+  @keyframes hostBobExcited{
+    0%,100%{ transform: translateY(0) rotate(-2deg) scale(1.03); }
+    50%{ transform: translateY(-4px) rotate(2deg) scale(1.06); }
+  }
+  /* Свечение позади реагирует на состояние ведущей — держим её визуально
+     привязанной к остальному HUD (те же зелёный/акцентный/золотой, что и
+     у бейджей рейтингов), а не просто статичным тёплым пятном. */
+  .hf-halo{
+    position:absolute; inset:-28px; border-radius:50%;
+    background: radial-gradient(circle, rgba(255,214,158,0.30), rgba(255,214,158,0) 68%);
+    transition: background .5s ease;
+  }
+  #host[data-state="waiting"] .hf-halo, #host[data-state="idle"] .hf-halo{
+    background: radial-gradient(circle, rgba(87,217,163,0.28), rgba(87,217,163,0) 68%);
+  }
+  #host[data-state="speaking"] .hf-halo{
+    background: radial-gradient(circle, rgba(143,123,255,0.40), rgba(143,123,255,0) 68%);
+    animation: haloPulse 1s ease-in-out infinite;
+  }
+  #host[data-state="excited"] .hf-halo{
+    background: radial-gradient(circle, rgba(255,207,107,0.50), rgba(255,207,107,0) 70%);
+    animation: haloPulse .45s ease-in-out infinite;
+  }
+  @keyframes haloPulse{
+    0%,100%{ transform: scale(1); opacity:1; }
+    50%{ transform: scale(1.1); opacity:.8; }
+  }
+  #hostCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  /* Мини-эквалайзер прямо на лице, справа ото рта — виден только когда
+     ведущая говорит (не занимает место, когда молчит). */
+  .host-eq{
+    position:absolute; left:58%; top:65%; transform:translateY(-50%);
+    display:flex; align-items:flex-end; gap:2px; height:10px; z-index:3;
+    opacity:0; transition: opacity .2s ease;
+  }
+  #host[data-state="speaking"] .host-eq,
+  #host[data-state="excited"] .host-eq{ opacity:1; }
+  .host-eq span{ width:3px; height:4px; border-radius:2px; background: var(--accent2); }
+  #host[data-state="speaking"] .host-eq span,
+  #host[data-state="excited"] .host-eq span{ animation: eqBounce .5s ease-in-out infinite; }
+  .host-eq span:nth-child(2){ animation-delay:.12s; }
+  .host-eq span:nth-child(3){ animation-delay:.24s; }
+  @keyframes eqBounce{ 0%,100%{ height:4px; } 50%{ height:12px; } }
+
+  .t3card{
+    flex:1; background: var(--panel); border:1px solid var(--border);
+    border-radius: 14px; padding: 8px 6px 9px; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: transform .25s ease;
+  }
+  .t3card.t3-1{
+    padding-top:12px; padding-bottom:12px; order:2;
+    border-color: rgba(255,207,107,0.55);
+    box-shadow: 0 0 20px rgba(255,207,107,0.28);
+  }
+  .t3card.t3-2{ order:1; margin-bottom:12px; }
+  .t3card.t3-3{ order:3; margin-bottom:12px; }
+  .t3card.empty{ opacity:0.42; }
+  .t3card.flash{ animation: t3flash 0.9s ease; }
+  @keyframes t3flash{
+    0%{ box-shadow:0 0 0 0 rgba(255,207,107,0.7); }
+    100%{ box-shadow:0 0 0 14px rgba(255,207,107,0); }
+  }
+  .t3medal{ font-size:36px; line-height:1; }
+  .t3card.t3-1 .t3medal{ font-size:46px; }
+  .t3avatar{
+    width:48px; height:48px; border-radius:50%; overflow:hidden; flex:none;
+    border:2px solid var(--border);
+  }
+  .t3card.t3-1 .t3avatar{ width:64px; height:64px; border-color: var(--gold); }
+  .t3card.t3-2 .t3avatar{ border-color: var(--silver); }
+  .t3card.t3-3 .t3avatar{ border-color: var(--bronze); }
+  .t3avatar img, .t3avatar .avfallback{ width:100%; height:100%; object-fit:cover; display:block; }
+  .t3name{ font-size:28px; font-weight:700; color:#fff; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t3coins{ font-size:27px; font-weight:800; color: var(--gold); }
+  .t3card.t3-2 .t3coins{ color: var(--silver); }
+  .t3card.t3-3 .t3coins{ color: var(--bronze); }
+
+  .avfallback{
+    display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%; font-weight:800; color:#fff; font-size:0.9em;
+  }
+  .avfallback.empty{ background:rgba(255,255,255,0.08); color:var(--text-faint); }
+
+  /* ── Event banner ──────────────────────────────────────── */
+  .eventbanner{
+    order:2;
+    background: linear-gradient(90deg, rgba(143,123,255,0.20), rgba(14,17,26,0.72));
+    border:1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 18px; display:flex; align-items:center; gap:14px;
+    min-height:96px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .eventbanner.pop{ animation: ebpop .35s ease; }
+  @keyframes ebpop{ 0%{ transform:scale(0.985); } 60%{ transform:scale(1.005); } 100%{ transform:scale(1); } }
+  .eb-avwrap{ position:relative; flex:none; }
+  .eb-icon{ font-size:72px; }
+  .eb-icon.badge{
+    position:absolute; right:-8px; bottom:-8px; font-size:32px; line-height:1;
+    background: var(--panel); border:1px solid var(--border); border-radius:50%;
+    width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+  }
+  .eb-avatar{
+    width:54px; height:54px; border-radius:50%; overflow:hidden; flex:none;
+    border:2px solid var(--border); background:rgba(255,255,255,0.06);
+  }
+  .eb-avatar img, .eb-avatar .avfallback{ width:100%; height:100%; object-fit:cover; font-size:1.3em; }
+  .eb-body{ flex:1; min-width:0; }
+  .eb-text{ font-size:42px; line-height:1.32; color: var(--text); }
+  .eb-text b{ color:#fff; }
+  .eb-next{
+    margin-top:5px; font-size:27px; color: var(--text-dim);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .eb-next b{ color: var(--gold); }
+
+  /* ── Leaderboards ──────────────────────────────────────── */
+  .leaderboards{
+    order:3; flex:none; display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  }
+  .lbcol{
+    background: var(--panel); border:1px solid var(--border); border-top-width:2px;
+    border-radius:14px;
+    padding:8px 7px; display:flex; flex-direction:column; min-height:0; min-width:0;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .lbcol.coins{ border-top-color: var(--gold); }
+  .lbcol.likes{ border-top-color: var(--pink); }
+  .lbhead{
+    font-size:26px; font-weight:800; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:4px; margin-bottom:5px; flex:none;
+  }
+  .lbhead.coins{ color: var(--gold); }
+  .lbhead.likes{ color: var(--pink); }
+  .lblist{ display:flex; flex-direction:column; gap:5px; overflow:hidden; }
+  .lbrow{
+    display:flex; align-items:center; gap:6px; padding:3px 2px; border-radius:6px;
+  }
+  .lbrow.flash{ animation: rowflash 1s ease; }
+  @keyframes rowflash{ 0%{ background:rgba(255,255,255,0.18); } 100%{ background:rgba(255,255,255,0); } }
+  .lbrank{ flex:none; width:32px; font-size:28px; font-weight:800; color:var(--text-faint); text-align:center; }
+  .lbrank.r1{ color:var(--gold); } .lbrank.r2{ color:var(--silver); } .lbrank.r3{ color:var(--bronze); }
+  .lbav{ flex:none; width:36px; height:36px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,0.08); }
+  .lbav img, .lbav .avfallback{ width:100%; height:100%; object-fit:cover; font-size:22px; }
+  .lbname{ flex:1; font-size:30px; font-weight:600; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .lbval{ flex:none; font-size:30px; font-weight:800; color:#fff; }
+  .lbempty{ font-size:25px; color:var(--text-faint); padding:8px 2px; line-height:1.4; }
+
+  .footer{
+    order:6;
+    text-align:center; font-size:23px; color: var(--text-faint); padding: 2px 0 0; flex:none;
+    letter-spacing:0.3px;
+  }
+
+  /* ── Визуальные эффекты (золотой дождь монет/вспышка на крупный донат) ── */
+  #fxLayer{ position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:50; }
+  .fx-coin{
+    position:absolute; top:-24px; font-size:40px;
+    animation: fxCoinFall 1.3s ease-in forwards;
+  }
+  @keyframes fxCoinFall{
+    0%{ transform: translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform: translateY(260px) rotate(200deg); opacity:0; }
+  }
+  .fx-goldcoin{
+    position:absolute; top:-40px;
+    animation: fxGoldFall linear forwards;
+    filter: drop-shadow(0 0 5px rgba(255,207,107,0.75));
+  }
+  @keyframes fxGoldFall{
+    0%{ transform: translateY(0) rotate(0deg); opacity:1; }
+    85%{ opacity:1; }
+    100%{ transform: translateY(940px) rotate(420deg); opacity:0; }
+  }
+  .fx-flash{
+    position:absolute; inset:0;
+    background: radial-gradient(circle at 50% 22%, rgba(255,214,120,0.55), rgba(255,214,120,0) 70%);
+    opacity:0; animation: fxFlash 0.6s ease-out forwards;
+  }
+  @keyframes fxFlash{
+    0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:0; }
+  }
+
+  /* ── Debug panel ───────────────────────────────────────── */
+  #debugPanel{
+    position:fixed; right:8px; bottom:8px; z-index:99;
+    background: rgba(0,0,0,0.86); border:1px solid rgba(255,255,255,0.2);
+    border-radius:12px; padding:8px; width:220px; font-size:11px;
+  }
+  #debugPanel .dbg-row{ margin-bottom:6px; color:#fff; }
+  #debugPanel .dbg-btns{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+  #debugPanel button{
+    font-size:10px; padding:6px 3px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
+    background:#1a1f2e; color:#fff; cursor:pointer;
+  }
+  #debugPanel button:active{ background:#2a3145; }
+</style>
+</head>
+<body>
+
+<!-- Кнопки справа как в остальных играх — фиксированы к экрану, не масштабируются
+     вместе со сценой. Кнопки озвучки диктора нет специально: диктор говорит
+     всегда, выключать его нельзя (музыки на странице пока нет — появится позже,
+     кнопка уже готова и запоминает выбор пользователя). -->
+<button id="backBtn" class="ui-btn" title="Главное меню">⌂</button>
+<button id="musicBtn" class="ui-btn" title="Музыка">🎵</button>
+<button id="fsBtn" class="ui-btn" title="На весь экран">⛶</button>
+
+<div id="stageWrap">
+  <div id="stage">
+
+    <div class="topbar">
+      <div class="brand"><span class="dotpulse"></span></div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="connBadge" id="connBadge" hidden>—</span>
+      </div>
+    </div>
+
+      <div class="hostCard">
+        <!-- Лицо ведущей: Live2D-модель "Kei", официальный бесплатный сэмпл
+             (https://www.live2d.com/en/learn/sample/kei/, разрешено для
+             коммерческого использования компаниям с доходом до 10 млн иен/год).
+             Рендерится через pixi-live2d-display в canvas; рот/моргание
+             управляются вручную из HostManager (см. ниже) — настоящего
+             аудио-лип-синка нет (у браузерного speechSynthesis нет доступа
+             к аудио-потоку), поэтому рот открывается по тем же "тикам" на
+             границах слов, что и раньше, просто через Live2D это выглядит
+             плавнее и живее (плюс бесплатно идут моргание и физика волос). -->
+        <div class="host-avatar" id="host" data-state="waiting">
+          <div class="hf-halo"></div>
+          <canvas id="hostCanvas"></canvas>
+          <div class="host-eq"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+
+      <div class="top3" id="top3">
+        <div class="t3card t3-2 empty" data-rank="2">
+          <div class="t3medal">🥈</div>
+          <div class="t3avatar"><div class="avfallback empty">?</div></div>
+          <div class="t3name">—</div>
+          <div class="t3coins"></div>
+        </div>
+        <div class="t3card t3-1 empty" data-rank="1">
+          <div class="t3medal">🥇</div>
+          <div class="t3avatar"><div class="avfallback empty">?</div></div>
+          <div class="t3name">—</div>
+          <div class="t3coins"></div>
+        </div>
+        <div class="t3card t3-3 empty" data-rank="3">
+          <div class="t3medal">🥉</div>
+          <div class="t3avatar"><div class="avfallback empty">?</div></div>
+          <div class="t3name">—</div>
+          <div class="t3coins"></div>
+        </div>
+      </div>
+
+    <div class="eventbanner" id="eventBanner">
+      <div class="eb-avwrap">
+        <div class="eb-icon" id="ebIcon">🤝</div>
+        <div class="eb-avatar" id="ebAvatar" hidden></div>
+      </div>
+      <div class="eb-body">
+        <div class="eb-text" id="ebText">Ждём первые события эфира…</div>
+        <div class="eb-next" id="ebNext" hidden></div>
+      </div>
+    </div>
+
+    <div class="leaderboards">
+      <div class="lbcol coins">
+        <div class="lbhead coins">💰 TOP COINS</div>
+        <div class="lblist" id="lbCoins"><div class="lbempty">Пока пусто</div></div>
+      </div>
+      <div class="lbcol likes">
+        <div class="lbhead likes">❤️ TOP LIKES</div>
+        <div class="lblist" id="lbLikes"><div class="lbempty">Пока пусто</div></div>
+      </div>
+    </div>
+
+    <div class="footer">📱 tiktokgames777</div>
+
+    <div id="fxLayer"></div>
+
+  </div>
+</div>
+
+<!-- Live2D-рендер ведущей (Kei, официальный бесплатный сэмпл Live2D,
+     https://www.live2d.com/en/learn/sample/kei/) — коммерческое использование
+     разрешено лицензией (компании с доходом до 10 млн иен/год). -->
+<script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+
+<div id="debugPanel" hidden>
+  <div class="dbg-row"><b>DEBUG</b> — статус: <span id="dbgStatus">—</span></div>
+  <div class="dbg-btns">
+    <button data-t="gift">TEST GIFT</button>
+    <button data-t="biggift">TEST BIG GIFT</button>
+    <button data-t="follow">TEST FOLLOW</button>
+    <button data-t="like">TEST LIKE</button>
+    <button data-t="join">TEST JOIN</button>
+    <button data-t="topchange">TEST TOP CHANGE</button>
+    <button data-t="mass">MASS EVENTS</button>
+    <button data-t="load">LOAD TEST 100/1000</button>
+    <button data-t="reset" style="grid-column:1/3">RESET SESSION</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// ВЗАИМКИ — интерактивная программа для TikTok LIVE (не игра).
+// Архитектура (см. ТЗ п.30-36):
+//   WS Adapter → EventBus → RankingEngine (state) → UI / VoiceManager / HostManager
+// Все данные только "здесь и сейчас" — RankingEngine.reset() на каждый новый LIVE,
+// постоянная БД не используется (см. ТЗ п.28).
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CONFIG = {
+  VOICE_ENABLED: true,
+  SPEECH_COOLDOWN_MS: 550,
+  BIG_GIFT_COINS: 200,
+  FOLLOW_ANNOUNCEMENT_COOLDOWN_MS: 4500,
+  CTA_INTERVAL_MIN_MS: 5000,
+  CTA_INTERVAL_MAX_MS: 8000,
+  MAX_LEADERBOARD_USERS: 5,
+};
+
+function fmt(n){ return Math.round(Number(n)||0).toLocaleString('ru-RU'); }
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Ники в TikTok — это отображаемое имя (не @хэндл), там может быть что угодно:
+// пробелы, эмодзи, любой язык (укр./кит./араб./вьетнамский с диакритикой и т.п.).
+// Раньше тут был белый список "латиница+рус.кириллица+цифры+_.", который резал
+// такие ники в пустую строку — а дальше событие с пустым ником целиком
+// дропалось на входе, поэтому часть зрителей была "невидимой" и не попадала
+// в топы. Теперь вырезаем только реально небезопасные для вёрстки символы
+// (управляющие/невидимые/bidi-override), всё остальное — оставляем как есть.
+function filterNick(n){
+  return String(n||'')
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F]/g, '')
+    .trim()
+    .slice(0, 40);
+}
+function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function tpl(s, nick, val){ return s.replace(/\[НИК\]/g, nick).replace(/\[COINS\]/g, val!=null?fmt(val):''); }
+let HOST_USERNAME = '';
+function hostRef(){ return HOST_USERNAME || 'ведущего'; }
+function tplHost(s){ return s.replace(/\[HOST\]/g, hostRef()); }
+function hashHue(str){
+  let h=0; str = String(str||'x');
+  for (let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+function vzAvatarFallback(img){
+  const initial = img.dataset.fallbackInitial || '?';
+  const hue = img.dataset.fallbackHue || '0';
+  const div = document.createElement('div');
+  div.className = 'avfallback';
+  div.style.background = 'hsl('+hue+',55%,42%)';
+  div.textContent = initial;
+  img.replaceWith(div);
+}
+function avatarNode(p){
+  const initial = escHtml((p.username||'?').trim().charAt(0).toUpperCase() || '?');
+  const hue = hashHue(p.userId || p.username || 'x');
+  if (p.avatarUrl){
+    return '<img src="'+escHtml(p.avatarUrl)+'" alt="" loading="lazy" '
+      + 'data-fallback-initial="'+initial+'" data-fallback-hue="'+hue+'" onerror="vzAvatarFallback(this)">';
+  }
+  return '<div class="avfallback" style="background:hsl('+hue+',55%,42%)">'+initial+'</div>';
+}
+
+// ── EventBus ─────────────────────────────────────────────────────────────
+const EventBus = (() => {
+  const listeners = {};
+  function on(type, fn){ (listeners[type] = listeners[type] || []).push(fn); }
+  function emit(type, payload){
+    (listeners[type]||[]).slice().forEach(fn => {
+      try { fn(payload); } catch(e){ console.error('[EventBus]', type, e); }
+    });
+  }
+  return { on, emit };
+})();
+
+// ── RankingEngine — только расчёт рейтингов, ничего не знает про UI/голос ──
+const RankingEngine = (() => {
+  let participants = new Map();
+  let prevTop3Ids = [];
+  let prevTop1Id = null;
+
+  function touch(userId, username, avatarUrl){
+    let p = participants.get(userId);
+    if (!p){
+      p = { userId, username: username||userId, avatarUrl: avatarUrl||'', coins:0, follows:0, likes:0 };
+      participants.set(userId, p);
+    } else {
+      if (username) p.username = username;
+      if (avatarUrl) p.avatarUrl = avatarUrl;
+    }
+    return p;
+  }
+
+  function updateCoins(userId, username, avatarUrl, amount){
+    const p = touch(userId, username, avatarUrl);
+    p.coins += amount;
+    _checkTopChange();
+    return p;
+  }
+  function updateFollowing(userId, username, avatarUrl, amount){
+    const p = touch(userId, username, avatarUrl);
+    p.follows += amount;
+    return p;
+  }
+  function updateLikes(userId, username, avatarUrl, amount){
+    const p = touch(userId, username, avatarUrl);
+    p.likes += amount;
+    return p;
+  }
+
+  function _sorted(field, n){
+    return Array.from(participants.values())
+      .filter(p => p[field] > 0)
+      .sort((a,b) => b[field]-a[field])
+      .slice(0, n);
+  }
+  function getTopCoins(n){ return _sorted('coins', n||10); }
+  function getTopFollowing(n){ return _sorted('follows', n||10); }
+  function getTopLikes(n){ return _sorted('likes', n||10); }
+  function getTop3Coins(){ return getTopCoins(3); }
+  function get(userId){ return participants.get(userId); }
+
+  function _checkTopChange(){
+    const top3 = getTop3Coins();
+    const ids = top3.map(p => p.userId);
+    const newTop1 = ids[0] || null;
+    const entered = ids.filter(id => prevTop3Ids.indexOf(id) === -1);
+
+    if (JSON.stringify(ids) !== JSON.stringify(prevTop3Ids)){
+      EventBus.emit('TOP3_CHANGED', { top3, entered, top1Id:newTop1 });
+    }
+    if (newTop1 && newTop1 !== prevTop1Id){
+      EventBus.emit('TOP1_CHANGED', { user: top3[0], previousUserId: prevTop1Id });
+    }
+    prevTop3Ids = ids;
+    prevTop1Id = newTop1;
+  }
+
+  function reset(){
+    participants = new Map();
+    prevTop3Ids = [];
+    prevTop1Id = null;
+  }
+
+  return { updateCoins, updateFollowing, updateLikes, getTopCoins, getTopFollowing, getTopLikes, getTop3Coins, get, reset };
+})();
+
+// ── HostManager — состояния виртуальной ведущей (IDLE/SPEAKING/EXCITED/WAITING) ──
+// Лицо — 5 готовых SVG-слоёв (idle/small/open/excited/blink), друг на друге,
+// видимым делается только нужный (см. .hf-layer.on в CSS).
+const HostManager = (() => {
+  let hostEl, app, model = null;
+  let state = 'waiting';
+  let mouthLoopId = null;
+  let mouthTarget = 0, eyeTarget = 1;
+  let mouthValue = 0, eyeValue = 1;
+  let excitedTimer = null, waitTimer = null, blinkTimer = null;
+
+  function init(){
+    hostEl = document.getElementById('host');
+    const canvas = document.getElementById('hostCanvas');
+    const box = hostEl.getBoundingClientRect();
+    app = new PIXI.Application({
+      view: canvas, width: box.width || 270, height: box.height || 270,
+      resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true,
+      backgroundAlpha: 0, antialias: true,
+    });
+    // грузим модель асинхронно и без автообновления — сами прогоняем model.update()
+    // каждый кадр и следом переопределяем параметры рта/глаз, иначе их бы
+    // затирал собственный цикл дыхания/физики модели
+    PIXI.live2d.Live2DModel.from('sprites/kei_live2d/kei_basic_free.model3.json', { autoUpdate: false })
+      .then(m => {
+        model = m;
+        model.anchor.set(0.5, 0.5);
+        const scale = Math.min(app.screen.width / model.width, app.screen.height / model.height) * 1.65;
+        model.scale.set(scale);
+        // Артборд модели Kei не идеально центрирован по лицу (сама модель визуально
+        // смещена влево от центра своего bounding box) — компенсируем сдвигом вправо.
+        model.x = app.screen.width / 2 + app.screen.width * 0.09;
+        model.y = app.screen.height * 0.58;
+        app.stage.addChild(model);
+      })
+      .catch(e => console.error('[HostManager] Live2D load failed', e));
+
+    app.ticker.add(() => {
+      if (!model) return;
+      model.update(PIXI.Ticker.shared.deltaMS);
+      mouthValue += (mouthTarget - mouthValue) * 0.35;
+      eyeValue += (eyeTarget - eyeValue) * 0.4;
+      const core = model.internalModel.coreModel;
+      core.setParameterValueById('ParamMouthOpenY', mouthValue);
+      core.setParameterValueById('ParamEyeLOpen', eyeValue);
+      core.setParameterValueById('ParamEyeROpen', eyeValue);
+    });
+
+    scheduleBlink();
+  }
+  function setState(s){
+    state = s;
+    if (hostEl) hostEl.setAttribute('data-state', s);
+  }
+  function mouthTick(){
+    mouthTarget = mouthTarget > 0.4 ? 0.05 : (0.5 + Math.random()*0.5);
+  }
+  function startMouthLoop(){
+    stopMouthLoop();
+    mouthLoopId = setInterval(mouthTick, 100 + Math.random()*70);
+  }
+  function stopMouthLoop(){
+    if (mouthLoopId){ clearInterval(mouthLoopId); mouthLoopId = null; }
+    mouthTarget = 0;
+  }
+  function setSpeaking(isSpeaking){
+    if (isSpeaking){
+      setState(state === 'excited' ? 'excited' : 'speaking');
+      startMouthLoop();
+    } else {
+      stopMouthLoop();
+      setState('idle');
+      clearTimeout(waitTimer);
+      waitTimer = setTimeout(() => { if (state === 'idle') setState('waiting'); }, 4000);
+    }
+  }
+  function pulseExcited(){
+    setState('excited');
+    clearTimeout(excitedTimer);
+    excitedTimer = setTimeout(() => { setState(mouthLoopId ? 'speaking' : 'idle'); }, 2200);
+  }
+  function scheduleBlink(){
+    const delay = 2600 + Math.random()*3200;
+    blinkTimer = setTimeout(() => {
+      eyeTarget = 0;
+      setTimeout(() => { eyeTarget = 1; }, 120);
+      scheduleBlink();
+    }, delay);
+  }
+  return { init, setState, setSpeaking, mouthTick, pulseExcited };
+})();
+
+// ── VoiceManager — очередь фраз с приоритетами, TTS через speechSynthesis ──
+const VoiceManager = (() => {
+  const synth = window.speechSynthesis || null;
+  let queueA = [], queueB = [];
+  let speaking = false;
+  let cachedVoice = null;
+  let idleTimer = null;
+  let started = false;
+
+  const CTA = {
+    gifts: [
+      'Не сдерживайте себя — дарите подарки, диктор не откажется!',
+      'Подарки — это как обнимашки, только диктор их ещё и озвучивает!',
+      'Зажатый донат скучает в кошельке — отпустите его в эфир!',
+      'Каждый подарок делает эфир чуточку веселее, проверено лично мной!',
+      'Кто подарит следующий — тот и герой этого часа!',
+      'Дарите подарки — рейтинг сам себя не заполнит!',
+      'Маленький подарок — тоже подарок, диктор не привередливая!',
+      'Диктор не ест — диктор озвучивает подарки, и это моя любимая диета!',
+      'У диктора отличный слух — особенно на звук донатика!',
+      'Кошелёк не убежит, а вот эфир без подарков заскучает!',
+      'Подарок — лучший способ сказать «привет» без слов. Хотя я всё равно скажу вслух!',
+      'Донат в студию! Обещаю, звучать буду искренне впечатлённо!',
+    ],
+    top: [
+      'Смотрите ТОП! Выбирайте участников и подписывайтесь друг на друга!',
+      'Хотите больше подписчиков? Поднимайтесь в рейтинге!',
+      'Не просто смотрим эфир — участвуем во взаимках!',
+      'Топ живой, топ меняется — успевайте запрыгнуть!',
+      'Топ как очередь в магазине — толкаться не надо, просто дарите и лайкайте!',
+      'Кто в топе — тот и красавчик дня, официально заявляю!',
+      'Место в топе бесплатно не занимают, но занять его проще, чем кажется!',
+    ],
+    mutual: [
+      'Взаимки — это просто: подписался сам, подписались на тебя!',
+      'Ищите друг друга в топе и подписывайтесь взаимно!',
+      'Чем больше взаимок — тем веселее эфир!',
+      'Подписка — это бесплатно, а друзей прибавляется!',
+      'Найдите соседа по топу и подпишитесь — займёт секунду!',
+      'Взаимная подписка ещё никого не разоряла, а вот друзей прибавляла!',
+      'Взаимка — как обмен наклейками в школе, только вместо наклеек подписки!',
+      'Не подписался — упустил взаимку, всё как в бизнесе, только без денег!',
+      'Найдите в топе того, кто ещё без взаимки, и спасите его от одиночества!',
+    ],
+    chest: [
+      'Ставьте свои сундуки!',
+      'Поставьте сундук и собирайте новых подписчиков!',
+      'Хотите больше взаимок? Ставьте свой сундук!',
+      'Сундук — магнит для новых друзей, проверьте сами!',
+      'Кто не поставил сундук — тот упускает вечеринку!',
+      'Сундуки на стол! Пусть эфир засияет монетами!',
+      'Сундук без крышки — просто коробка, а с крышкой — уже вечеринка!',
+      'Без сундука эфир как пицца без сыра — вроде и ничего, но чего-то не хватает!',
+    ],
+    likes: [
+      'Ставим лайки, разгоняем эфир!',
+      'Поддерживаем эфир лайками!',
+      'Чем активнее эфир — тем больше взаимок!',
+      'Пальчик вверх — и эфир летит выше!',
+      'Лайки ничего не стоят, а эфиру приятно — жмите!',
+      'Экран не сотрётся от лайков, обещаю — жмите смело!',
+      'Лайк — самая ленивая форма любви, но самая быстрая!',
+      'Один лайк — капля, тысяча лайков — океан! Давайте океан!',
+    ],
+    followHost: [
+      'Кстати, подписывайтесь на [HOST] — будем на связи!',
+      'Не забудьте подписаться на [HOST], чтобы не пропустить следующий эфир!',
+      'Если ещё не с нами — жмите подписаться на [HOST] прямо сейчас!',
+      'Подписка на [HOST] — лучшее решение за сегодня!',
+      'Подпишитесь на [HOST] — вам не сложно, а нам приятно!',
+      'Подпишитесь на [HOST], чтобы точно не потеряться!',
+      'Ещё не подписаны на [HOST]? Диктор немного расстроена, но простит, если исправите!',
+      'Один клик — и вы уже часть семьи [HOST]!',
+      'Подпишитесь на [HOST], пока я не начала считать до трёх!',
+      'Без подписки на [HOST] звёзды не сойдутся, проверено астрологами!',
+      'Кнопка подписки на [HOST] не кусается, честное диктор-слово!',
+      'Учёные доказали: подписка на [HOST] продлевает жизнь. Ну, почти доказали!',
+    ],
+    share: [
+      'Делимся эфиром с друзьями!',
+      'Отправьте эфир друзьям — чем больше людей, тем больше взаимок!',
+      'Киньте ссылку другу — вдвоём веселее!',
+      'Поделитесь эфиром — пусть друзья тоже найдут свои взаимки!',
+      'Чем больше зрителей — тем громче вечеринка! Делитесь эфиром!',
+      'Позовите друга — вдвоём донатить веселее, я проверяла!',
+      'Друг без взаимок — это грустно, спасите его ссылкой на эфир!',
+    ],
+    climb: [
+      'Хотите попасть в ТОП? Получайте активность и участвуйте во взаимках!',
+      'Ещё немного — и вы в лидерах!',
+      'До топа рукой подать — не останавливайтесь!',
+      'Лидеры не рождаются — они дарят, лайкают и подписываются!',
+      'Ваше место в топе почти свободно — успейте занять!',
+      'Топ не резиновый, но местечко для вас найдётся — поторопитесь!',
+      'Лестница в топ короче, чем кажется — один донат, и вы уже выше!',
+      'Ещё чуть-чуть активности — и я буду называть вас по имени с гордостью!',
+    ],
+  };
+  const CTA_ORDER = ['gifts','mutual','chest','likes','followHost','share','climb','top'];
+  let ctaIdx = -1, ctaCycles = 0;
+
+  function pickVoice(){
+    if (cachedVoice || !synth) return cachedVoice;
+    const voices = synth.getVoices();
+    cachedVoice =
+      voices.find(v => /ru/i.test(v.lang) && /(female|женск|milena|irina|anna|elena|katya|olya|alyona|цветкова)/i.test(v.name)) ||
+      voices.find(v => /ru[-_]/i.test(v.lang) && !/(pavel|male|мужск|dmitri|yuri)/i.test(v.name)) ||
+      voices.find(v => /ru/i.test(v.lang)) ||
+      voices.find(v => v.default) || voices[0] || null;
+    return cachedVoice;
+  }
+
+  function speakText(text, done){
+    if (!synth){ done(); return; }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ru-RU'; u.rate = 1.05; u.pitch = 1.08;
+    u.volume = CONFIG.VOICE_ENABLED ? 1 : 0;
+    const v = pickVoice(); if (v) u.voice = v;
+    let doneCalled = false;
+    const finish = () => { if (doneCalled) return; doneCalled = true; HostManager.setSpeaking(false); done(); };
+    u.onstart = () => HostManager.setSpeaking(true);
+    u.onboundary = () => HostManager.mouthTick();
+    u.onend = finish; u.onerror = finish;
+    setTimeout(finish, 9000);
+    try { synth.speak(u); } catch(e){ finish(); }
+  }
+
+  // Следующий в очереди на озвучку (только для реальных доноров/подписчиков,
+  // не для CTA-филлеров — у тех нет ника) — показываем в UI, чтобы человек
+  // видел, что его точно услышат, даже пока диктор договаривает про другого.
+  function peekNextNick(){
+    const item = queueA[0] || queueB[0];
+    return item ? item.nick : null;
+  }
+  function updateNextTicker(){ UI.setNextUp(peekNextNick()); }
+
+  function next(){
+    if (speaking) return;
+    clearTimeout(idleTimer);
+    let item = null;
+    if (queueA.length) item = queueA.shift();
+    else if (queueB.length) item = queueB.shift();
+    updateNextTicker();
+    if (!item){ scheduleFiller(); return; }
+    speaking = true;
+    speakText(item.text, () => { speaking = false; setTimeout(next, CONFIG.SPEECH_COOLDOWN_MS); });
+  }
+
+  function say(text, level, nick){
+    if (!text) return;
+    const item = { text, nick: nick || null };
+    if (level === 'A'){
+      if (synth) synth.cancel();
+      speaking = false;
+      queueA.push(item);
+      if (queueA.length > 4) queueA.shift();
+    } else {
+      queueB.push(item);
+      if (queueB.length > 5) queueB.shift(); // защита от спама при шквале событий
+    }
+    next();
+    updateNextTicker();
+  }
+
+  function nextFiller(){
+    ctaCycles++;
+    ctaIdx = (ctaIdx + 1) % CTA_ORDER.length;
+    return tplHost(rnd(CTA[CTA_ORDER[ctaIdx]]));
+  }
+  function scheduleFiller(){
+    clearTimeout(idleTimer);
+    const delay = CONFIG.CTA_INTERVAL_MIN_MS + Math.random()*(CONFIG.CTA_INTERVAL_MAX_MS-CONFIG.CTA_INTERVAL_MIN_MS);
+    idleTimer = setTimeout(() => {
+      if (speaking || queueA.length || queueB.length) return;
+      const text = nextFiller();
+      speaking = true;
+      speakText(text, () => { speaking = false; scheduleFiller(); });
+    }, delay);
+  }
+
+  let _unlocked = false;
+  function unlock(){
+    if (_unlocked || !synth) return;
+    _unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(''); u.volume = 0; synth.speak(u); } catch(e){}
+  }
+  // iOS/некоторые браузеры усыпляют speechSynthesis без событий — периодически будим
+  setInterval(() => { try { if (synth && synth.paused) synth.resume(); } catch(e){} }, 4000);
+
+  // Многие браузеры молча блокируют первый speak() без жеста пользователя
+  // (нет ни onerror, ни onend) — если это произошло, очередь "зависает" до
+  // первого клика/нажатия клавиши на странице. На реальном стриме (OBS) это
+  // не проблема — там автоплей обычно разрешён; но при обычном открытии
+  // вкладки в браузере диктор может молчать, пока по странице не кликнут.
+  let _interacted = false;
+  function armInteractionUnlock(){
+    const onFirstInteract = () => {
+      if (_interacted) return;
+      _interacted = true;
+      unlock();
+      if (!speaking) next();
+    };
+    document.addEventListener('pointerdown', onFirstInteract, { once:true });
+    document.addEventListener('keydown', onFirstInteract, { once:true });
+  }
+
+  const GREETING = [
+    'Всем привет! Начинаем взаимки — подписывайтесь друг на друга!',
+    'Эфир начинается! Ищите друг друга в топе и участвуйте во взаимках!',
+    'Взаимки стартуют! Подписывайтесь на участников и растите топ вместе!',
+    'Всем привет, я на связи! Дарим подарки, ставим лайки, находим друзей — погнали!',
+    'Эфир открыт! Кто первый подарит, лайкнет и подпишется — тот и красавчик!',
+  ];
+
+  function start(){
+    if (started) return; started = true;
+    unlock();
+    armInteractionUnlock();
+    if (synth) synth.onvoiceschanged = () => { cachedVoice = null; pickVoice(); };
+    // приветствие сразу, не дожидаясь случайной паузы обычного филлера —
+    // иначе создаётся впечатление, что диктор молчит
+    say(rnd(GREETING), 'B');
+  }
+
+  return { say, start };
+})();
+
+// ── UI — рендер, троттлится через requestAnimationFrame ────────────────────
+const UI = (() => {
+  const dirty = { coins:false, likes:false, top3:false };
+  let rafScheduled = false;
+  let top3Cards = null;
+
+  function scheduleRender(field){
+    dirty[field] = true;
+    if (rafScheduled) return;
+    rafScheduled = true;
+    requestAnimationFrame(() => { rafScheduled = false; flush(); });
+  }
+  function flush(){
+    if (dirty.top3){ renderTop3(RankingEngine.getTop3Coins()); dirty.top3=false; }
+    if (dirty.coins){ renderLb('coins', RankingEngine.getTopCoins(CONFIG.MAX_LEADERBOARD_USERS)); dirty.coins=false; }
+    if (dirty.likes){ renderLb('likes', RankingEngine.getTopLikes(CONFIG.MAX_LEADERBOARD_USERS)); dirty.likes=false; }
+  }
+
+  const LB_MAP = { coins:{el:'lbCoins', key:'coins'}, likes:{el:'lbLikes', key:'likes'} };
+  function renderLb(field, list){
+    const cfg = LB_MAP[field];
+    const el = document.getElementById(cfg.el);
+    if (!el) return;
+    if (!list.length){ el.innerHTML = '<div class="lbempty">Пока никого — ждём активность</div>'; return; }
+    el.innerHTML = list.map((p,i) => {
+      const rankCls = i<3 ? ' r'+(i+1) : '';
+      return '<div class="lbrow"><span class="lbrank'+rankCls+'">'+(i+1)+'</span>'
+        + '<span class="lbav">'+avatarNode(p)+'</span>'
+        + '<span class="lbname">'+escHtml(p.username)+'</span>'
+        + '<span class="lbval">'+fmt(p[cfg.key])+'</span></div>';
+    }).join('');
+  }
+
+  function renderTop3(top3){
+    if (!top3Cards) top3Cards = {
+      1: document.querySelector('.t3card.t3-1'),
+      2: document.querySelector('.t3card.t3-2'),
+      3: document.querySelector('.t3card.t3-3'),
+    };
+    [1,2,3].forEach(rank => {
+      const card = top3Cards[rank];
+      const p = top3[rank-1];
+      if (!p){
+        card.classList.add('empty');
+        card.querySelector('.t3name').textContent = '—';
+        card.querySelector('.t3coins').textContent = '';
+        card.querySelector('.t3avatar').innerHTML = '<div class="avfallback empty">?</div>';
+        return;
+      }
+      const wasUid = card.dataset.uid;
+      card.classList.remove('empty');
+      card.querySelector('.t3name').textContent = p.username;
+      card.querySelector('.t3coins').textContent = fmt(p.coins)+' coins';
+      card.querySelector('.t3avatar').innerHTML = avatarNode(p);
+      if (wasUid !== p.userId){
+        card.dataset.uid = p.userId;
+        card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+      }
+    });
+  }
+
+  function showEvent(icon, html, person){
+    const b = document.getElementById('eventBanner');
+    const iconEl = document.getElementById('ebIcon');
+    const avEl = document.getElementById('ebAvatar');
+    iconEl.textContent = icon;
+    if (person){
+      avEl.innerHTML = avatarNode(person);
+      avEl.hidden = false;
+      iconEl.classList.add('badge');
+    } else {
+      avEl.hidden = true;
+      iconEl.classList.remove('badge');
+    }
+    document.getElementById('ebText').innerHTML = html;
+    b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+  }
+
+  // "Далее в озвучке" — чтобы задонативший видел, что его точно заметят,
+  // даже пока диктор ещё договаривает фразу про кого-то другого.
+  function setNextUp(nick){
+    const el = document.getElementById('ebNext');
+    if (!nick){ el.hidden = true; return; }
+    el.innerHTML = 'Далее: <b>'+escHtml(nick)+'</b>';
+    el.hidden = false;
+  }
+
+  function resetAll(){
+    renderTop3([]);
+    renderLb('coins', []);
+    renderLb('likes', []);
+    showEvent('🤝', 'Новый эфир — ждём первые события…');
+    setNextUp(null);
+  }
+
+  return { scheduleRender, showEvent, setNextUp, resetAll, renderTop3, renderLb };
+})();
+
+// ── FX — визуальные эффекты на донаты (золотой дождь/монеты/вспышка) ────
+const FX = (() => {
+  const layer = () => document.getElementById('fxLayer');
+
+  // Крупный донат — дождь золотых монет на весь экран (не мелкое конфетти),
+  // вперемешку с искрами. По ощущению это должно быть событие "ого!", а не
+  // фоновая рябь.
+  function goldCoinShower(){
+    const l = layer(); if (!l) return;
+    const n = 20 + Math.floor(Math.random()*6);
+    for (let i=0;i<n;i++){
+      const el = document.createElement('div');
+      el.className = 'fx-goldcoin';
+      el.textContent = Math.random() < 0.25 ? '✨' : '🪙';
+      el.style.left = (Math.random()*94) + '%';
+      el.style.fontSize = (22 + Math.random()*14) + 'px';
+      el.style.animationDelay = (Math.random()*0.6) + 's';
+      el.style.animationDuration = (1.6 + Math.random()*0.9) + 's';
+      l.appendChild(el);
+      setTimeout(() => el.remove(), 2800);
+    }
+  }
+
+  function coinRain(){
+    const l = layer(); if (!l) return;
+    const n = 5 + Math.floor(Math.random()*3);
+    for (let i=0;i<n;i++){
+      const el = document.createElement('div');
+      el.className = 'fx-coin';
+      el.textContent = '🪙';
+      el.style.left = (20 + Math.random()*60) + '%';
+      el.style.animationDelay = (Math.random()*0.3) + 's';
+      l.appendChild(el);
+      setTimeout(() => el.remove(), 1800);
+    }
+  }
+
+  function screenFlash(){
+    const l = layer(); if (!l) return;
+    const el = document.createElement('div');
+    el.className = 'fx-flash';
+    l.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+
+  return { goldCoinShower, coinRain, screenFlash };
+})();
+
+// ── Фразы диктора ───────────────────────────────────────────────────────
+const PHRASES = {
+  gift: [
+    '[НИК] отправил подарок на [COINS] coins! Настоящий герой эфира!',
+    '[НИК] закинул [COINS] coins в наш эфир — вот это щедрость!',
+    'Подарок от [НИК] — [COINS] coins! Спасибо, вы прекрасны!',
+    '[НИК] поддержал эфир на [COINS] coins! Есть на кого равняться!',
+    'О, [НИК] не пожалел [COINS] coins! Аплодисменты!',
+    '[НИК] дарит [COINS] coins — карма улучшается прямо на глазах!',
+    'Внимание, подарок! [НИК] — [COINS] coins в копилку эфира!',
+    '[НИК] радует нас на [COINS] coins! Вот это настроение!',
+  ],
+  giftBig: [
+    'Вот это подарок! [НИК] отправил [COINS] coins! Зал взрывается аплодисментами!',
+    'Ничего себе! [НИК] закинул сразу [COINS] coins! Это должно попасть в историю эфира!',
+    'Огромный подарок от [НИК] — [COINS] coins! Вот это движение!',
+    'Стоп, что происходит?! [НИК] отправил [COINS] coins! Уровень легенды!',
+    '[НИК] только что купил себе место в топе! [COINS] coins — красота!',
+    'Держите меня семеро! [НИК] дарит [COINS] coins!',
+  ],
+  becameTop1: [
+    'И это выводит [НИК] на первое место!',
+    'Вот это движение! [НИК] выходит на первое место!',
+    '[НИК] теперь на первом месте в ТОП COINS!',
+    'Новый король эфира — [НИК]! Кто сможет его подвинуть?',
+    '[НИК] забирает корону! Первое место занято!',
+    'Смена лидера! Встречайте [НИК] на первом месте!',
+  ],
+  enteredTop3: [
+    '[НИК] входит в ТОП 3! Подписываемся!',
+    'Смотрите — [НИК] уже в ТОП 3!',
+    '[НИК] врывается в тройку лидеров!',
+    'Топ-3 обновился — привет, [НИК]!',
+    '[НИК] в тройке! Ищите его и подписывайтесь!',
+  ],
+  follow: [
+    '[НИК] подписался! Вот так работают взаимки!',
+    'Новая взаимка! [НИК] подписался!',
+    '[НИК] только что подписался — красота!',
+    'Подписка от [НИК]! Взаимки в деле!',
+    '[НИК] нажал заветную кнопку — подписка оформлена!',
+    'Ещё одна взаимка — спасибо, [НИК]!',
+  ],
+};
+
+// ── Обработчики доменных событий ────────────────────────────────────────
+let _lastFollowSpokenAt = 0;
+
+EventBus.on('GIFT_RECEIVED', (d) => {
+  const nick = filterNick(d.username) || 'Зритель';
+  const uid = String(d.userId||'');
+  if (!uid) return;
+  const coins = Math.max(0, Math.floor(Number(d.coins)||0));
+  if (coins <= 0) return;
+
+  RankingEngine.updateCoins(uid, nick, d.avatarUrl, coins);
+  UI.showEvent('🎁', '<b>'+escHtml(nick)+'</b> отправил'
+    + (d.giftName ? ' «'+escHtml(d.giftName)+'»' : ' подарок')
+    + ' — <b>'+fmt(coins)+' coins</b>!', { username: nick, userId: uid, avatarUrl: d.avatarUrl });
+  UI.scheduleRender('coins'); UI.scheduleRender('top3');
+
+  const big = coins >= CONFIG.BIG_GIFT_COINS;
+  VoiceManager.say(tpl(rnd(big ? PHRASES.giftBig : PHRASES.gift), nick, coins), big ? 'A' : 'B', nick);
+  if (big){ HostManager.pulseExcited(); FX.goldCoinShower(); FX.screenFlash(); }
+  else { FX.coinRain(); }
+});
+
+EventBus.on('LIKE_RECEIVED', (d) => {
+  const nick = filterNick(d.username) || 'Зритель';
+  const uid = String(d.userId||'');
+  if (!uid) return;
+  const likes = Math.max(1, Math.floor(Number(d.likes)||1));
+  RankingEngine.updateLikes(uid, nick, d.avatarUrl, likes);
+  UI.scheduleRender('likes');
+});
+
+EventBus.on('FOLLOW_RECEIVED', (d) => {
+  const nick = filterNick(d.username) || 'Зритель';
+  const uid = String(d.userId||'');
+  if (!uid) return;
+  RankingEngine.updateFollowing(uid, nick, d.avatarUrl, 1);
+  UI.showEvent('🤝', '<b>'+escHtml(nick)+'</b> подписался! Новая взаимка.', { username: nick, userId: uid, avatarUrl: d.avatarUrl });
+
+  const now = Date.now();
+  if (now - _lastFollowSpokenAt >= CONFIG.FOLLOW_ANNOUNCEMENT_COOLDOWN_MS){
+    _lastFollowSpokenAt = now;
+    VoiceManager.say(tpl(rnd(PHRASES.follow), nick), 'B', nick);
+  }
+});
+
+EventBus.on('TOP1_CHANGED', (d) => {
+  const nick = filterNick(d.user.username) || 'Зритель';
+  VoiceManager.say(tpl(rnd(PHRASES.becameTop1), nick), 'A', nick);
+  FX.screenFlash();
+});
+
+EventBus.on('TOP3_CHANGED', (d) => {
+  UI.scheduleRender('top3');
+  (d.entered||[]).forEach(id => {
+    if (id === d.top1Id) return; // уже озвучено через TOP1_CHANGED — не дублируем
+    const p = RankingEngine.get(id);
+    const nick = p ? (filterNick(p.username) || 'Зритель') : '';
+    if (nick) VoiceManager.say(tpl(rnd(PHRASES.enteredTop3), nick), 'A');
+  });
+});
+
+// ── WS Adapter + SessionManager ─────────────────────────────────────────
+let _ws = null, _wsUser = '', _mode = 'connecting';
+
+function wsConnect(username){
+  _wsUser = username;
+  if (_ws && _ws.readyState < 2){ _ws.onclose = null; _ws.close(); }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  _ws = new WebSocket(proto+'//'+location.host+'?username='+encodeURIComponent(username));
+  _ws.onopen = () => Debug.setStatus('connecting…');
+  _ws.onmessage = (e) => {
+    let d;
+    try { d = JSON.parse(e.data); } catch(err){ return; }
+    try {
+      if (d.type === 'status' || d.type === 'init'){
+        onConnStatus(d.tiktokMode || d.mode || 'connecting');
+      } else if (d.type === 'vzaimki_gift'){
+        EventBus.emit('GIFT_RECEIVED', d);
+      } else if (d.type === 'vzaimki_like'){
+        EventBus.emit('LIKE_RECEIVED', d);
+      } else if (d.type === 'vzaimki_follow'){
+        EventBus.emit('FOLLOW_RECEIVED', d);
+      } else if (d.type === 'vzaimki_member'){
+        EventBus.emit('USER_JOINED', d);
+      }
+    } catch(err){ console.error('[vzaimki ws]', err); }
+  };
+  _ws.onclose = () => { Debug.setStatus('❌ разрыв, переподключение…'); setTimeout(() => wsConnect(_wsUser), 3000); };
+  _ws.onerror = () => {};
+}
+
+let _sessionStarted = false;
+function onConnStatus(mode){
+  Debug.setStatus(mode);
+  const badge = document.getElementById('connBadge');
+  if (badge) badge.textContent = mode === 'tiktok' ? '🔴 LIVE' : (mode === 'demo' ? '🟡 демо/ожидание' : '⏳ подключение');
+  // Сбрасываем рейтинг только один раз за открытие страницы — на первое
+  // реальное подключение к эфиру (по ТЗ п.27 каждый эфир — отдельная сессия).
+  // Раньше проверяли просто "_mode !== 'tiktok'", из-за чего обычный
+  // кратковременный реконнект TikTok (demo -> tiktok посреди того же эфира)
+  // тоже ловил это условие и стирал все накопленные донаты/лайки/подписки —
+  // баг: "во время эфира сбились данные".
+  if (mode === 'tiktok' && !_sessionStarted){
+    _sessionStarted = true;
+    RankingEngine.reset();
+    UI.resetAll();
+    _lastFollowSpokenAt = 0;
+    HostManager.setState('waiting');
+    EventBus.emit('SESSION_STARTED', {});
+  }
+  _mode = mode;
+}
+
+// ── DEBUG MODE — ручная генерация событий без реального TikTok LIVE ────────
+const Debug = (() => {
+  const NAMES = ['Alex','Lana_777','Vika_fire','Sergey_','Maximka','DoBro','Smile_21','NightWolf','Katya_M','Angel_Kiss','You_Smart','Dimonchik'];
+  let idCounter = 1000;
+  function rndUser(){
+    const n = NAMES[Math.floor(Math.random()*NAMES.length)] + (Math.random()<0.3 ? Math.floor(Math.random()*99) : '');
+    return { userId: 'test'+(idCounter++), username: n, avatarUrl: '' };
+  }
+  function setStatus(m){
+    const el = document.getElementById('dbgStatus');
+    if (el) el.textContent = m;
+  }
+  function fireGift(big){ EventBus.emit('GIFT_RECEIVED', Object.assign(rndUser(), { giftName: big?'Galaxy':'Rose', coins: big ? (500+Math.floor(Math.random()*2000)) : (1+Math.floor(Math.random()*80)) })); }
+  function fireFollow(){ EventBus.emit('FOLLOW_RECEIVED', rndUser()); }
+  function fireLike(){ EventBus.emit('LIKE_RECEIVED', Object.assign(rndUser(), { likes: 1+Math.floor(Math.random()*20) })); }
+  function fireJoin(){ EventBus.emit('USER_JOINED', rndUser()); }
+  function fireTopChange(){ EventBus.emit('GIFT_RECEIVED', Object.assign(rndUser(), { giftName:'Crown', coins: 5000+Math.floor(Math.random()*5000) })); }
+  function fireMass(){ for (let i=0;i<20;i++) setTimeout(() => (Math.random()<0.5?fireLike():fireGift(false)), i*80); }
+  function fireLoad(){
+    for (let i=0;i<1000;i++) setTimeout(fireLike, i*3);
+    for (let i=0;i<100;i++) setTimeout(fireFollow, i*15);
+    for (let i=0;i<100;i++) setTimeout(() => fireGift(false), i*20);
+  }
+  function wire(){
+    document.querySelectorAll('#debugPanel button[data-t]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.t;
+        if (t==='gift') fireGift(false);
+        else if (t==='biggift') fireGift(true);
+        else if (t==='follow') fireFollow();
+        else if (t==='like') fireLike();
+        else if (t==='join') fireJoin();
+        else if (t==='topchange') fireTopChange();
+        else if (t==='mass') fireMass();
+        else if (t==='load') fireLoad();
+        else if (t==='reset'){ RankingEngine.reset(); UI.resetAll(); }
+      });
+    });
+  }
+  return { setStatus, wire };
+})();
+
+// ── Масштабирование 600×1000 под окно (OBS обычно даёт точный размер) ──────
+function fitStage(){
+  const stage = document.getElementById('stage');
+  const scale = Math.min(window.innerWidth/600, window.innerHeight/1000, 1.6);
+  stage.style.transform = 'translate(-50%,-50%) scale('+scale+')';
+}
+window.addEventListener('resize', fitStage);
+
+// ── Bootstrap ────────────────────────────────────────────────────────────
+(function init(){
+  fitStage();
+  HostManager.init();
+  UI.resetAll();
+  VoiceManager.start();
+
+  const p = new URLSearchParams(location.search);
+  const debug = p.get('debug') === '1';
+  if (debug){
+    document.getElementById('debugPanel').hidden = false;
+    document.getElementById('connBadge').hidden = false;
+    Debug.wire();
+  }
+
+  document.getElementById('backBtn').addEventListener('click', () => { window.location.href = '/'; });
+  document.getElementById('fsBtn').addEventListener('click', () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen().catch(()=>{});
+  });
+  // Музыки пока нет в проекте — кнопка только хранит выбор пользователя
+  // (localStorage), чтобы когда фоновую музыку добавят, mute сразу заработал.
+  const musicBtn = document.getElementById('musicBtn');
+  let musicEnabled = localStorage.getItem('vzaimki_music') !== '0';
+  musicBtn.textContent = musicEnabled ? '🎵' : '🔇';
+  musicBtn.addEventListener('click', () => {
+    musicEnabled = !musicEnabled;
+    localStorage.setItem('vzaimki_music', musicEnabled ? '1' : '0');
+    musicBtn.textContent = musicEnabled ? '🎵' : '🔇';
+  });
+
+  const u = (p.get('username')||'').replace(/^@/,'').trim();
+  if (u){ HOST_USERNAME = u; wsConnect(u); }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гараж внутри — черновик</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Arial,sans-serif;user-select:none}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{width:min(100vw,100vh*16/9);height:auto;aspect-ratio:16/9;display:block}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="1280" height="720"></canvas></div>
+<script>
+// ═══ ЧЕРНОВИК v4: ГАРАЖ ВНУТРИ — готовая картинка-фон (референс пользователя) вместо
+// нарисованных примитивов. Комната больше НЕ рисуется кодом — только фон-картинка +
+// персонаж поверх неё с обычной ходьбой/выходом, как во всех остальных комнатах игры.
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const CW = 1280, CH = 720, FIGHTER_H = 160;
+const ready = im => im && im.complete && im.naturalWidth;
+
+const BG = new Image(); BG.src = 'sprites/room_bg/garage_bg2.png';   // новая картинка — без девочки, чище пол
+
+// зона ходьбы — пол на картинке начинается примерно с середины экрана
+const Y_MIN = 380, Y_MAX = 700, X_MIN = 40, X_MAX = 1240;
+const persp = y => 0.72 + 0.28 * (Math.max(0, Math.min(1, (y - Y_MIN) / (Y_MAX - Y_MIN))));
+// выход — низ по центру (как во всех остальных комнатах)
+const DOOR = { x0:560, x1:760 };
+const nearDoor = () => me.y > Y_MAX - 20 && me.x > DOOR.x0 && me.x < DOOR.x1;
+// невидимые "стены" — чтобы не проходить сквозь верстак/шины/шкафы слева и машину справа
+// (сама картинка не трогается, это просто зоны-заглушки поверх неё, прикидочно по глазу)
+const BLOCKS = [
+  { x0:0,   x1:660,  y0:Y_MIN, y1:410 },   // верстак / полки / шины / красные шкафы — левая стена (по линии, что нарисовал пользователь)
+  { x0:930, x1:1280, y0:Y_MIN, y1:415 },   // машина — правая стена
+];
+function pushOutOfBlocks(){
+  for (const b of BLOCKS){
+    if (me.x > b.x0 && me.x < b.x1 && me.y > b.y0 && me.y < b.y1){
+      const dl = me.x-b.x0, dr = b.x1-me.x, dt = me.y-b.y0, db = b.y1-me.y, m = Math.min(dl,dr,dt,db);
+      if (m===dt) me.y = b.y0; else if (m===db) me.y = b.y1; else if (m===dl) me.x = b.x0; else me.x = b.x1;
+    }
+  }
+}
+
+const CH_DEF = { bancho: { base:'urban_brawlers', variant:'bancho_v4_teal', idle:[7,9], walk:[6,12] } };
+const _fc = {};
+function frames(type, anim){
+  const d = CH_DEF[type], k = type+'|'+anim; if (_fc[k]) return _fc[k];
+  const n = d[anim][0], out = [];
+  for (let i=1;i<=n;i++){ const im = new Image(); im.src = `sprites/${d.base}/${d.variant}/${anim==='idle'?'Idle':'Walk'}/${anim}${i}.png`; out.push(im); }
+  return _fc[k] = out;
+}
+const me = { x:640, y:640, face:1, t:0, moving:false };
+
+const keys = {};
+let note = null;
+addEventListener('keydown', e => { keys[e.code] = true; if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)) e.preventDefault();
+  if (e.code === 'KeyE' && nearDoor()) note = { text: 'Выход на улицу (в черновике не работает)', t: 2.2 }; });
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+function update(dt){
+  let dx = 0, dy = 0;
+  if (keys.ArrowLeft || keys.KeyA) dx -= 1; if (keys.ArrowRight || keys.KeyD) dx += 1;
+  if (keys.ArrowUp || keys.KeyW) dy -= 1;   if (keys.ArrowDown || keys.KeyS) dy += 1;
+  const run = (keys.ShiftLeft || keys.ShiftRight) ? 1.6 : 1, len = Math.hypot(dx, dy) || 1;
+  me.moving = !!(dx || dy);
+  if (dx) me.face = dx > 0 ? 1 : -1;
+  me.x += dx/len * 240 * run * dt; me.y += dy/len * 130 * run * dt;
+  me.x = Math.max(X_MIN, Math.min(X_MAX, me.x)); me.y = Math.max(Y_MIN, Math.min(Y_MAX, me.y));
+  pushOutOfBlocks();
+  me.t += dt;
+  if (note){ note.t -= dt; if (note.t <= 0) note = null; }
+}
+
+function txt(s, x, y, size, color, align){
+  ctx.font = `bold ${size}px "Arial Black", Arial`; ctx.textAlign = align || 'center'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = Math.max(3, size/6); ctx.strokeText(s, x, y); ctx.fillStyle = color; ctx.fillText(s, x, y);
+}
+function rr(x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+// ── свет: подсвечиваем лампы/неон, которые уже нарисованы на картинке — сама картинка
+// не трогается, поверх неё рисуется мягкое цветное свечение (аддитивно), с лёгким мерцанием
+// координаты сняты программно с самой картинки (поиск самого яркого тёплого/синего пикселя
+// в области каждого светильника) — раньше были на глаз и промахивались мимо лампочки
+const LAMPS = [ [96,129], [358,191], [518,171], [935,197], [1131,175] ];          // тёплые подвесные лампы (3-я/4-я/5-я были смещены на колпак — пересчитано центроидом тёплого пятна, не по пиковому пикселю)
+const NEONS = [ [459,25], [276,122], [772,48], [993,106] ];                        // синие неоновые трубки на потолке
+function drawLights(t){
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const flick = 0.85 + 0.15*Math.sin(t*0.02);
+  LAMPS.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.015 + i));
+    const g = ctx.createRadialGradient(x,y,2,x,y+70,190);
+    g.addColorStop(0, `rgba(255,210,130,${0.85*f})`); g.addColorStop(0.35, `rgba(255,160,70,${0.32*f})`); g.addColorStop(1,'rgba(255,160,70,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y+40,190,0,Math.PI*2); ctx.fill();
+    // без яркой точки-кружка в центре — только мягкое свечение вокруг лампы, по просьбе пользователя
+  });
+  NEONS.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.02 + i*1.7));
+    const g = ctx.createRadialGradient(x,y,2,x,y,120);
+    g.addColorStop(0, `rgba(150,215,255,${0.8*f})`); g.addColorStop(0.4, `rgba(120,195,255,${0.25*f})`); g.addColorStop(1,'rgba(140,210,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,120,0,Math.PI*2); ctx.fill();
+  });
+  // свет от жёлтых ламп над столом убран — смотрелся как левое круглое пятно, не как подсветка
+  ctx.restore();
+}
+
+// вывеска EXIT над выходом — видна издалека, не только когда игрок рядом
+function drawExitSign(t){
+  const cx = (DOOR.x0+DOOR.x1)/2, y = Y_MAX - 34;
+  ctx.save(); ctx.strokeStyle = '#3dff9a'; ctx.lineWidth = 3; ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 16;
+  ctx.globalAlpha = 0.8 + 0.2*Math.sin(t*0.006);
+  ctx.strokeRect(DOOR.x0, Y_MAX-4, DOOR.x1-DOOR.x0, 6);
+  ctx.restore();
+  ctx.save(); ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 14;
+  txt('EXIT', cx, y, 22, '#3dff9a');
+  ctx.restore();
+}
+function drawPlayer(){
+  const k = persp(me.y), h = FIGHTER_H * k;
+  const anim = me.moving ? 'walk' : 'idle', list = frames('bancho', anim), fps = CH_DEF.bancho[anim][1];
+  const img = list[Math.floor(me.t*fps) % list.length];
+  ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(me.x,me.y,26*k,8*k,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  if (ready(img)){
+    let sc = h / img.naturalHeight; if (img.naturalWidth*sc > h*1.55) sc = h*1.55/img.naturalWidth;
+    const dw = img.naturalWidth*sc, dh = img.naturalHeight*sc;
+    ctx.save(); ctx.translate(me.x,me.y); if (me.face<0) ctx.scale(-1,1); ctx.imageSmoothingEnabled = false; ctx.drawImage(img,-dw/2,-dh+6,dw,dh); ctx.restore();
+  } else { ctx.fillStyle = '#ff5a3d'; ctx.fillRect(me.x-14*k, me.y-h, 28*k, h-6); }
+  txt('Ты', me.x, me.y - h - 8, 15, '#ffd23f');
+}
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05,(now-last)/1000); last = now;
+  update(dt);
+  ctx.clearRect(0,0,CW,CH);
+  if (ready(BG)) ctx.drawImage(BG, 0, 0, CW, CH);
+  else { ctx.fillStyle = '#111'; ctx.fillRect(0,0,CW,CH); txt('Загрузка фона…', CW/2, CH/2, 24, '#fff'); }
+  drawLights(now);
+  drawExitSign(now);
+  drawPlayer();
+  // ОТЛАДКА: границы зоны ходьбы (зелёная рамка) и невидимых стен-заглушек (красные) — видно только в черновике
+  ctx.save();
+  ctx.strokeStyle = '#3dff6a'; ctx.lineWidth = 3; ctx.setLineDash([10,6]); ctx.strokeRect(X_MIN, Y_MIN, X_MAX-X_MIN, Y_MAX-Y_MIN);
+  ctx.strokeStyle = '#ff3d3d'; ctx.lineWidth = 3;
+  BLOCKS.forEach(b => ctx.strokeRect(b.x0, b.y0, b.x1-b.x0, b.y1-b.y0));
+  ctx.strokeStyle = '#3dd0ff'; ctx.strokeRect(DOOR.x0, Y_MAX-20, DOOR.x1-DOOR.x0, 20);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(8,8,16,0.8)'; rr(16,16,360,44,10); ctx.fill(); ctx.strokeStyle = '#ff5a3d'; ctx.lineWidth = 2; rr(16,16,360,44,10); ctx.stroke();
+  txt('ГАРАЖ · ЧЕРНОВИК v4 (фон-картинка)', 30, 46, 16, '#ffb38a', 'left');
+  ctx.font = '13px Arial'; ctx.fillStyle = 'rgba(220,226,250,0.9)';
+  ['← → ↑ ↓ / WASD — ходить, Shift — бежать', 'внизу по центру — выход (E)'].forEach((s,i) => { ctx.textAlign='left'; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=3; ctx.strokeText(s,20,CH-44+i*18); ctx.fillText(s,20,CH-44+i*18); });
+  if (nearDoor()) txt('🚪 Выйти на улицу  [E]', CW/2, CH-52, 22, '#3dff9a');
+  if (note){ ctx.globalAlpha = Math.min(1, note.t/0.4); txt(note.text, CW/2, 300, 24, '#fff'); ctx.globalAlpha = 1; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

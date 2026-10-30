@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Leha Neploxo Game</title>
+<link rel="icon" href="img/world_icon_192.png">
+<link rel="manifest" href="world.webmanifest">
+<link rel="apple-touch-icon" href="img/world_icon_180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="apple-mobile-web-app-title" content="Leha Neploxo">
+<meta name="theme-color" content="#08040f">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Arial,sans-serif;color:#fff;
+            -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{width:min(100vw, 100vh*16/9);height:auto;aspect-ratio:16/9;background:#000;display:block;touch-action:none}
+  /* Экран вертикальный (например, включена блокировка поворота) — не блокируем игру, а разворачиваем картинку на 90° */
+  @media (orientation:portrait){
+    body.ingame #wrap{display:block}
+    body.ingame canvas{position:fixed;left:50%;top:50%;width:min(100vh,177.78vw);transform:translate(-50%,-50%) rotate(90deg)}
+  }
+
+  /* экраны входа / создания персонажа */
+  #ov{position:fixed;inset:0;z-index:20;display:flex;
+      background:radial-gradient(ellipse at 50% 30%,#2a1140 0%,#08040f 70%);overflow:auto;padding:12px;box-sizing:border-box}
+  #ov[hidden]{display:none}
+  .box{margin:auto;background:rgba(12,10,24,.94);border:2px solid #6f4bd8;border-radius:16px;padding:22px 26px;
+       width:min(420px,100%);box-sizing:border-box;box-shadow:0 0 40px rgba(120,70,255,.35)}
+  .box.wide{width:min(900px,100%)}
+  h1{margin:0 0 4px;font-size:30px;text-align:center;letter-spacing:2px;color:#ffd23f;text-shadow:0 0 14px rgba(255,80,0,.6)}
+  .sub{text-align:center;color:#9fb0d8;font-size:13px;margin-bottom:14px}
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tab{flex:1;padding:10px;text-align:center;border-radius:10px;background:#1a1730;color:#9fb0d8;cursor:pointer;font-weight:bold}
+  .tab.on{background:#6f4bd8;color:#fff}
+  label{display:block;font-size:13px;color:#b9c5e8;margin:10px 0 4px}
+  input{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:2px solid #2b2650;background:#0a0818;color:#fff;
+        font-size:16px;outline:none;-webkit-user-select:text;user-select:text}
+  input:focus{border-color:#8a63ff}
+  .hint{font-size:12px;color:#8391b8;margin-top:5px}
+  .warn{font-size:13px;color:#ffc933;background:rgba(255,200,50,.08);border:1px solid rgba(255,200,50,.35);border-radius:8px;padding:8px 10px;margin-top:12px}
+  .err{min-height:20px;color:#ff7b7b;font-size:14px;margin-top:10px;text-align:center}
+  button.main{width:100%;padding:14px;margin-top:8px;border:0;border-radius:12px;background:linear-gradient(#ff7a3d,#e0472e);color:#fff;
+       font-size:18px;font-weight:bold;cursor:pointer}
+  button.main:disabled{opacity:.5;cursor:default}
+  .link{margin-top:12px;text-align:center;font-size:13px;color:#8391b8;cursor:pointer;text-decoration:underline}
+  .cards{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .card{border:2px solid #2b2650;border-radius:12px;padding:10px;background:#0d0b1e;cursor:pointer;text-align:center}
+  .card{flex:0 0 calc(25% - 8px);min-width:0;box-sizing:border-box}
+  @media (max-width:760px){.card{flex-basis:calc(50% - 6px)}}
+  .card.on{border-color:#ffd23f;box-shadow:0 0 16px rgba(255,210,63,.4)}
+  .card img{height:110px;image-rendering:pixelated}
+  .card .nm{font-weight:bold;margin:4px 0 6px}
+  .st{display:flex;align-items:center;gap:6px;font-size:12px;margin:3px 0;color:#c9d3f2}
+  .st span{width:60px;text-align:left}.st i{display:block;height:8px;border-radius:4px}
+  .sw{display:flex;justify-content:center;gap:6px;margin-top:6px}
+  .sw img{height:44px;width:calc(33.3% - 4px);object-fit:contain;box-sizing:border-box;border:2px solid transparent;border-radius:8px;padding:2px;background:#15122b}
+  .sw img.on{border-color:#ffd23f}
+  #msg{position:fixed;inset:0;z-index:25;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);
+       font-size:22px;text-align:center;padding:20px}
+  #msg[hidden]{display:none}
+  #msg > div{max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #msgText{white-space:pre-line;line-height:1.5;max-width:520px}
+  #topRightBtns{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));
+      z-index:40;display:flex;flex-direction:column;gap:8px}
+  #fs,#snd,#music,#rules{position:static;width:40px;height:40px;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.25);
+      background:rgba(10,10,24,.55);color:#fff;opacity:.5;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  #fs:hover,#fs:active,#snd:hover,#snd:active,#music:hover,#music:active,#rules:hover,#rules:active{opacity:1}
+  #fs svg{width:22px;height:22px}
+  #fs .ic-off{display:none}#fs.on .ic-on{display:none}#fs.on .ic-off{display:block}
+  #snd,#music,#rules{font-size:20px}
+  @media (max-height:520px){
+    #ov{padding:8px}
+    .box{padding:12px 18px}
+    h1{font-size:22px;margin:0}
+    .sub{display:none}
+    .tabs{margin-bottom:8px}.tab{padding:7px}
+    label{margin:6px 0 2px}
+    input{padding:8px 10px}
+    .warn{padding:5px 8px;margin-top:6px;font-size:12px}
+    .err{min-height:14px;margin-top:4px}
+    button.main{padding:10px;margin-top:4px;font-size:16px}
+    .card{padding:6px}.card img{height:64px}.card .nm{margin:2px 0 3px;font-size:14px}
+    .st{margin:1px 0;font-size:11px}.sw{margin-top:3px}.sw img{height:30px}
+    .cards{gap:6px}
+    .card{flex-basis:calc(20% - 5px)}
+  }
+  #scrStart{width:min(940px,100%);margin:auto;display:flex;flex-direction:column;gap:10px}
+  #scrStart[hidden]{display:none}
+  .banner{position:relative;height:clamp(150px,54vh,360px);border-radius:16px;overflow:hidden;border:2px solid #6f4bd8;
+          box-shadow:0 0 40px rgba(120,70,255,.4);background:linear-gradient(#05010c 0%,#160a2c 55%,#2a1140 100%)}
+  .banner .stars{position:absolute;inset:0;overflow:hidden}
+  .banner .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:tw 2.4s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:.15}50%{opacity:.95}}
+  @keyframes glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+  @keyframes drift{from{background-position:0 82%}to{background-position:-1200px 82%}}
+  .banner .city{position:absolute;inset:0;background:url(sprites/streets_of_fight/stage/back.png) repeat-x 0 82%/auto 70%;image-rendering:pixelated;animation:drift 40s linear infinite}
+  .banner .punks{position:absolute;left:0;right:0;bottom:5%;height:70%}
+  .banner .punk{position:absolute;bottom:0;height:clamp(56px,min(30vh,21vw),190px);image-rendering:pixelated;filter:drop-shadow(0 4px 2px rgba(0,0,0,.6)) brightness(.82)}
+  .banner .road{position:absolute;left:0;right:0;bottom:0;height:24%;background:linear-gradient(#2c3f57,#0e1622);border-top:3px solid #6b5f68}
+  .banner .fighters{position:absolute;left:0;right:0;bottom:6%;display:flex;justify-content:space-evenly;align-items:flex-end;padding:0 2%;z-index:2}
+  .banner .fighters img{height:clamp(56px,min(30vh,21vw),190px);max-width:24%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 6px 3px rgba(0,0,0,.65))}
+  .banner .ttl{position:absolute;top:5%;left:0;right:0;text-align:center;font-family:"Arial Black",Arial;line-height:1.02;z-index:3}
+  .banner .t1{font-size:clamp(20px,min(8vh,7.4vw),62px);color:#ffd23f;letter-spacing:2px;text-shadow:0 0 18px rgba(255,90,0,.9),0 3px 0 #7a2a00;animation:glow 2.6s ease-in-out infinite}
+  .banner .t2{font-size:clamp(26px,min(11vh,10vw),84px);color:#ff4a3a;letter-spacing:8px;text-shadow:0 0 22px rgba(255,40,0,.85),0 4px 0 #500;animation:glow 2.6s ease-in-out infinite .3s}
+  .banner .tag{position:absolute;left:0;right:0;bottom:1.5%;text-align:center;font-size:clamp(11px,2.4vh,15px);color:#cfd8ff;letter-spacing:1px;text-shadow:0 1px 3px #000;z-index:3}
+  .langs{display:flex;gap:8px;justify-content:center}
+  .lang{flex:1;max-width:200px;padding:10px 6px;border-radius:10px;border:2px solid #2b2650;background:#14112a;color:#9fb0d8;font-size:15px;font-weight:bold;cursor:pointer}
+  .lang.on{background:#6f4bd8;border-color:#a58bff;color:#fff}
+  #scrStart button.main{margin-top:0}
+  @media (max-height:520px){ .lang{padding:7px 4px;font-size:14px} #scrStart{gap:6px} }
+  .pw{position:relative}
+  .pw input{padding-right:46px}
+  .eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:36px;height:36px;padding:0;border:0;background:transparent;
+       color:#8391b8;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .eye svg{width:22px;height:22px}
+  .eye .e-off{display:none}.eye.on{color:#ffd23f}.eye.on .e-on{display:none}.eye.on .e-off{display:block}
+  .pwrow{display:flex;flex-direction:column}
+  @media (max-height:520px){ .pwrow{flex-direction:row;gap:8px}.pwcol{flex:1;min-width:0} }
+  #clanForm{position:fixed;inset:0;z-index:26;display:flex;background:rgba(0,0,0,.72);padding:10px;overflow:auto}
+  #clanForm[hidden]{display:none}
+  #msg button{margin-top:16px;padding:12px 26px;border:0;border-radius:10px;background:#6f4bd8;color:#fff;font-size:17px;font-weight:bold}
+  #chatForm{position:fixed;inset:0;z-index:26;display:flex;background:rgba(0,0,0,.72);padding:10px;overflow:auto}
+  #chatForm[hidden]{display:none}
+  #admForm{position:fixed;inset:0;z-index:28;display:flex;background:rgba(0,0,0,.78);padding:10px;overflow:auto}
+  #admForm[hidden]{display:none}
+  #admForm .box{color:#dfe6ff}
+  #admSum{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+  #admSum div{flex:1 1 120px;background:#14112a;border:1px solid #2b2650;border-radius:10px;padding:8px 10px;text-align:center;font-size:12px;color:#9fb0d8}
+  #admSum b{display:block;font-size:22px;color:#ffd23f;margin-top:2px}
+  #admSearch{margin:0 0 8px}
+  #admWrap{max-height:min(48vh,380px);overflow:auto;border:1px solid #2b2650;border-radius:10px}
+  #admTbl{width:100%;border-collapse:collapse;font-size:13px}
+  #admTbl th{position:sticky;top:0;background:#1c1838;color:#9fb0d8;cursor:pointer;padding:7px 8px;text-align:left;white-space:nowrap;user-select:none}
+  #admTbl td{padding:6px 8px;border-top:1px solid #1f1b3a;white-space:nowrap}
+  #admTbl tr.on td:first-child{color:#7dff9a}
+  #admTbl tr.hid td{opacity:.5}
+  .admHide{color:#ffb37a;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px solid #4a3a2a}
+  .admHide:hover{background:#2a2014}
+  #modForm{position:fixed;inset:0;z-index:27;display:flex;background:rgba(0,0,0,.72);padding:10px;overflow:auto}
+  #modForm[hidden]{display:none}
+  #modForm .box button{margin-top:10px}
+  #chatLog{height:min(50vh,360px);overflow-y:auto;background:#0c0a18;border:1px solid #2b2650;border-radius:10px;padding:10px;margin:12px 0;text-align:left;font-size:14px;line-height:1.5;color:#dfe6ff}
+  #chatLog .cm{margin-bottom:6px;word-break:break-word}
+  #chatLog .cm b{color:#ffd23f}
+  .chatRow{display:flex;gap:8px}
+  .chatRow input{flex:1;margin:0}
+  .chatRow button{margin:0;width:auto;padding:0 22px;white-space:nowrap}
+</style>
+</head>
+<body>
+<audio id="bgMusic" src="audio/streetfighter_theme.mp3" loop preload="auto"></audio>
+<div id="wrap"><canvas id="c" width="1280" height="720"></canvas></div>
+
+<div id="ov">
+  <!-- стартовая страница: баннер игры + выбор языка -->
+  <div id="scrStart">
+    <div class="banner">
+      <div class="stars" id="bnStars"></div>
+      <div class="city"></div><div class="road"></div>
+      <div class="punks" id="bnPunks"></div>
+      <div class="fighters" id="bnFighters">
+        <img src="sprites/urban_brawlers/brute_arms/Idle/idle1.png" data-base="urban_brawlers" data-dir="brute_arms" data-n="8" alt="">
+        <img src="sprites/streets_of_fight/brawler_girl_v5_blue/Idle/idle1.png" data-base="streets_of_fight" data-dir="brawler_girl_v5_blue" data-n="4" alt="">
+        <img src="sprites/urban_brawlers/batting_girl_v7_pink/Idle/idle1.png" data-base="urban_brawlers" data-dir="batting_girl_v7_pink" data-n="15" alt="">
+        <img src="sprites/urban_brawlers/bancho_v4_teal/Idle/idle1.png" data-base="urban_brawlers" data-dir="bancho_v4_teal" data-n="7" alt="">
+      </div>
+      <div class="ttl"><div class="t1">LEHA NEPLOXO</div><div class="t2">GAME</div></div>
+      <div class="tag" data-i="tagline"></div>
+    </div>
+    <div class="langs">
+      <button class="lang" data-lang="uk">Українська</button>
+      <button class="lang" data-lang="en">English</button>
+      <button class="lang" data-lang="ru">Русский</button>
+    </div>
+    <button class="main" id="play" data-i="play"></button>
+  </div>
+  <!-- вход / регистрация -->
+  <div class="box" id="scrAuth" hidden>
+    <h1>LEHA NEPLOXO GAME</h1>
+    <div class="tabs"><div class="tab on" id="tabReg" data-i="tab_reg"></div><div class="tab" id="tabLog" data-i="tab_log"></div></div>
+    <label for="nick" data-i="nick"></label>
+    <input id="nick" maxlength="16" autocomplete="username" autocapitalize="off" spellcheck="false" data-ph="nick_ph">
+    <div class="hint" id="nickHint" data-i="nick_hint"></div>
+    <div class="pwrow">
+      <div class="pwcol">
+        <label for="pass" data-i="pass"></label>
+        <div class="pw">
+          <input id="pass" type="password" maxlength="64" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-ph="pass_ph">
+          <button type="button" class="eye" id="eye" data-title="show_pass">
+            <svg class="e-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="e-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0112 20C5 20 1 12 1 12a18.5 18.5 0 015.1-5.9M9.9 4.2A10.7 10.7 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.2 3.2M1 1l22 22"/><path d="M14.1 14.1a3 3 0 11-4.2-4.2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="pwcol" id="pass2Box">
+        <label for="pass2" data-i="pass2"></label>
+        <div class="pw"><input id="pass2" type="password" maxlength="64" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-ph="pass2_ph"></div>
+      </div>
+    </div>
+    <div class="warn" id="passWarn" data-i="pass_warn"></div>
+    <div class="err" id="err"></div>
+    <button class="main" id="go"></button>
+  </div>
+  <!-- выбор бойца (тот же экран — и при регистрации, и при смене бойца в игре) -->
+  <div class="box wide" id="scrCreate" hidden>
+    <h1 id="createTitle" data-i="choose_title"></h1><div class="sub" id="createSub" data-i="choose_sub"></div>
+    <div class="cards" id="cards"></div>
+    <div class="err" id="err2"></div>
+    <button class="main" id="start" data-i="go_world"></button>
+    <div class="link" id="createCancel" data-i="cancel" hidden></div>
+  </div>
+</div>
+<div id="topRightBtns">
+  <button id="fs" data-title="fs_title">
+    <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+  </button>
+  <button id="snd" data-title="snd_title">🔊</button>
+  <button id="music" data-title="music_title">🎵</button>
+  <button id="rules" data-title="rules_title">📜</button>
+</div>
+<div id="clanForm" hidden>
+  <div class="box">
+    <h1 data-i="clan_form_title"></h1>
+    <label for="cName" data-i="clan_name"></label>
+    <input id="cName" maxlength="20" autocomplete="off" spellcheck="false" data-ph="clan_name_ph">
+    <label for="cTag" data-i="clan_tag"></label>
+    <input id="cTag" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" data-ph="clan_tag_ph">
+    <div class="err" id="cErr"></div>
+    <button class="main" id="cGo" data-i="clan_create_go"></button>
+    <div class="link" id="cCancel" data-i="cancel"></div>
+  </div>
+</div>
+<div id="msg" hidden><div><div id="msgText"></div><button id="msgBtn">Ок</button></div></div>
+<div id="chatForm" hidden>
+  <div class="box wide">
+    <h1 data-i="chat_title"></h1>
+    <div id="chatLog"></div>
+    <div class="chatRow">
+      <input id="chatInput" maxlength="200" autocomplete="off" spellcheck="false" data-ph="chat_ph">
+      <button class="main" id="chatSendBtn" data-i="chat_send_btn"></button>
+    </div>
+    <div class="link" id="chatClose" data-i="cancel"></div>
+  </div>
+</div>
+<div id="admForm" hidden>
+  <div class="box wide">
+    <h1>Админка</h1>
+    <div id="admSum"></div>
+    <input id="admSearch" placeholder="Поиск по нику" autocomplete="off" spellcheck="false">
+    <label id="admShowRow" style="display:flex;gap:8px;align-items:center;font-size:13px;color:#9fb0d8;margin:0 0 8px"><input type="checkbox" id="admShowHidden" style="width:auto;margin:0"> <span id="admShowTxt">Показывать скрытые (тестовые) аккаунты</span></label>
+    <div id="admWrap"><table id="admTbl"><thead><tr>
+      <th data-k="n">Ник</th><th data-k="lv">Ур.</th><th data-k="ps">Время в игре</th><th data-k="ls">Последний заход</th><th data-k="cr">Регистрация</th><th data-k="mo">$</th><th></th>
+    </tr></thead><tbody id="admBody"></tbody></table></div>
+    <div class="link" id="admClose">Закрыть</div>
+  </div>
+</div>
+<div id="modForm" hidden>
+  <div class="box">
+    <h1 data-i="mod_title"></h1>
+    <div class="sub" id="modTarget"></div>
+    <label for="modMinutes" data-i="mod_minutes"></label>
+    <input id="modMinutes" type="number" min="0" step="1" value="10">
+    <div class="hint" data-i="mod_hint"></div>
+    <div class="err" id="modErr"></div>
+    <button class="main" id="modMuteBtn" data-i="mod_mute_btn"></button>
+    <button class="main" id="modBanBtn" data-i="mod_ban_btn" style="background:#8a1f1f"></button>
+    <div class="link" id="modCancel" data-i="cancel"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════════════
+//  МИР — клиент. Всё считает сервер (/world-ws), клиент рисует и шлёт ввод.
+// ═══════════════════════════════════════════════════════════════════════════
+const L = {"ru":{"tagline":"Уличные бои онлайн","play":"ИГРАТЬ","tab_reg":"Регистрация","tab_log":"Вход","nick":"Никнейм","nick_ph":"например Tiger_77","nick_hint":"3–16 символов: буквы, цифры и _ · ник уникальный","pass":"Пароль","pass_ph":"от 6 символов","pass_warn":"⚠ Запомни пароль: без почты его нельзя восстановить.","btn_reg":"Создать аккаунт","btn_log":"Войти","choose_title":"ВЫБЕРИ БОЙЦА","choose_sub":"Стартовые характеристики зависят от бойца. Выбор нельзя изменить позже.","go_world":"В мир!","st_str":"Сила","st_hp":"Здоровье","st_spd":"Скорость","f_brute_arms":"Качок","f_bancho":"Хулиган","f_batting_girl":"Девушка с битой","f_brawler_girl":"Уличная боец","z0":"Тёмный переулок","z1":"Кирпичная улица","z2":"Гараж","z3":"ПЛОЩАДЬ","z4":"Пиццерия","z5":"Улица с окнами","z6":"Ночной клуб","lbl_safe":"БЕЗОПАСНО","lbl_consent":"ПО СОГЛАСИЮ","lbl_danger":"ОПАСНО","sub_hub":"драться нельзя","sub_safe":"только боты, игроки не дерутся","sub_consent":"бой с игроком — только по принятому вызову","sub_danger":"бой без правил — бить можно любого","pill":"ур.","lvl_big":"УР.","xp":"опыт {0} / {1}","points":"★ Очки: {0}","duel_hud":"⚔ Дуэль: {0}","menu":"☰ Персонаж","walk":"ХОДЬБА","btn_hit":"УДАР","btn_kick":"ПИНОК","btn_block":"БЛОК","hint1":"← → ↑ ↓ / WASD — ходить, Shift — бежать","hint2":"J — удар   K — пинок   Пробел — блок","hint3":"E — игрок рядом   Tab — персонаж","connecting":"Подключение к миру…","ko":"НОКАУТ","lvlup":"НОВЫЙ УРОВЕНЬ: {0}","lvlup_sub":"+{0} очка характеристик","block_dmg":"БЛОК −{0}","bot_prefix":"Бот · ","fighter_lbl":"Боец: ","card_bot":"Это бот — бей его!","duel_btn":"⚔ Вызвать на дуэль","lvl_word":"ур. {0}","panel_title":"Персонаж: {0}","panel_info":"Уровень {0}    •    Свободных очков: {1}","d_str":"урон ударов","d_hp":"макс. здоровье","d_spd":"скорость ходьбы и бега","no_reset":"Очки нельзя сбросить — выбор окончательный","logout":"Выйти","inv_title":"⚔ {0} вызывает тебя на дуэль","accept":"Принять","decline":"Отказаться","nobody":"Рядом никого нет","no_card_combat":"В бою карточка недоступна","duel_with":"Дуэль с {0}!","m_consent_only":"Здесь бой только по вызову — нажми на игрока","m_no_fight":"В этом районе драться нельзя","m_ko_respawn":"Тебя вырубили — возрождение на площади","m_win_over":"Победа над {0}!","m_duel_interrupted":"Дуэль прервана","m_duel_timeout":"Дуэль закончилась по времени","m_duel_only_consent":"Дуэль — только в районах «по согласию»","m_other_zone":"Игрок в другом районе","m_already_dueling":"Кто-то из вас уже в дуэли","m_already_invited":"Игроку уже отправлен вызов","m_invite_sent":"Вызов отправлен: {0}","m_declined":"{0} отказался от дуэли","need_login_msg":"Нужно войти заново","btn_ok":"Ок","kicked":"Ты зашёл в игру с другого устройства","play_here":"Играть здесь","fs_title":"На весь экран","understood":"Понятно","ios_help":"На iPhone браузер не даёт открыть игру на весь экран.\n\nСделай так один раз:\n1. Нажми «Поделиться» (квадрат со стрелкой)\n2. Выбери «На экран Домой»\n3. Запускай игру с новой иконки — она откроется без полосок браузера","err_nick_bad":"Ник: 3–16 символов, только буквы, цифры и _","err_nick_reserved":"Этот ник зарезервирован","err_pass_bad":"Пароль: от 6 до 64 символов","err_nick_taken":"Этот ник уже занят","err_too_many":"Слишком много попыток, подожди минуту","err_bad_creds":"Неверный ник или пароль","err_need_login":"Нужно войти заново","err_bad_fighter":"Неверный выбор бойца","err_char_exists":"Персонаж уже создан","err_unavailable":"Мир временно недоступен, попробуй через минуту","err_server_error":"Ошибка сервера","err_net":"Ошибка связи"},"uk":{"tagline":"Вуличні бої онлайн","play":"ГРАТИ","tab_reg":"Реєстрація","tab_log":"Вхід","nick":"Нікнейм","nick_ph":"наприклад Tiger_77","nick_hint":"3–16 символів: літери, цифри та _ · нік унікальний","pass":"Пароль","pass_ph":"від 6 символів","pass_warn":"⚠ Запам’ятай пароль: без пошти його не можна відновити.","btn_reg":"Створити акаунт","btn_log":"Увійти","choose_title":"ОБЕРИ БІЙЦЯ","choose_sub":"Стартові характеристики залежать від бійця. Вибір не можна змінити пізніше.","go_world":"У світ!","st_str":"Сила","st_hp":"Здоров’я","st_spd":"Швидкість","f_brute_arms":"Качок","f_bancho":"Хуліган","f_batting_girl":"Дівчина з бітою","f_brawler_girl":"Вулична бійчиня","z0":"Темний провулок","z1":"Цегляна вулиця","z2":"Гараж","z3":"ПЛОЩА","z4":"Піцерія","z5":"Вулиця з вікнами","z6":"Нічний клуб","lbl_safe":"БЕЗПЕЧНО","lbl_consent":"ЗА ЗГОДОЮ","lbl_danger":"НЕБЕЗПЕЧНО","sub_hub":"битися не можна","sub_safe":"лише боти, гравці не б’ються","sub_consent":"бій з гравцем — лише за прийнятим викликом","sub_danger":"бій без правил — можна бити будь-кого","pill":"рів.","lvl_big":"РІВ.","xp":"досвід {0} / {1}","points":"★ Очки: {0}","duel_hud":"⚔ Дуель: {0}","menu":"☰ Персонаж","walk":"ХОДЬБА","btn_hit":"УДАР","btn_kick":"ПІНОК","btn_block":"БЛОК","hint1":"← → ↑ ↓ / WASD — ходити, Shift — бігти","hint2":"J — удар   K — пінок   Пробіл — блок","hint3":"E — гравець поруч   Tab — персонаж","connecting":"Підключення до світу…","ko":"НОКАУТ","lvlup":"НОВИЙ РІВЕНЬ: {0}","lvlup_sub":"+{0} очки характеристик","block_dmg":"БЛОК −{0}","bot_prefix":"Бот · ","fighter_lbl":"Боєць: ","card_bot":"Це бот — бий його!","duel_btn":"⚔ Викликати на дуель","lvl_word":"рів. {0}","panel_title":"Персонаж: {0}","panel_info":"Рівень {0}    •    Вільних очок: {1}","d_str":"шкода від ударів","d_hp":"макс. здоров’я","d_spd":"швидкість ходьби та бігу","no_reset":"Очки не можна скинути — вибір остаточний","logout":"Вийти","inv_title":"⚔ {0} викликає тебе на дуель","accept":"Прийняти","decline":"Відмовитися","nobody":"Поруч нікого немає","no_card_combat":"У бою картка недоступна","duel_with":"Дуель з {0}!","m_consent_only":"Тут бій лише за викликом — натисни на гравця","m_no_fight":"У цьому районі битися не можна","m_ko_respawn":"Тебе вирубили — відродження на площі","m_win_over":"Перемога над {0}!","m_duel_interrupted":"Дуель перервано","m_duel_timeout":"Дуель закінчилась за часом","m_duel_only_consent":"Дуель — лише в районах «за згодою»","m_other_zone":"Гравець в іншому районі","m_already_dueling":"Хтось із вас уже в дуелі","m_already_invited":"Гравцеві вже надіслано виклик","m_invite_sent":"Виклик надіслано: {0}","m_declined":"{0} відмовився від дуелі","need_login_msg":"Потрібно увійти знову","btn_ok":"Ок","kicked":"Ти зайшов у гру з іншого пристрою","play_here":"Грати тут","fs_title":"На весь екран","understood":"Зрозуміло","ios_help":"На iPhone браузер не дозволяє відкрити гру на весь екран.\n\nЗроби так один раз:\n1. Натисни «Поділитися» (квадрат зі стрілкою)\n2. Обери «На екран «Додому»»\n3. Запускай гру з нової іконки — вона відкриється без смуг браузера","err_nick_bad":"Нік: 3–16 символів, лише літери, цифри та _","err_nick_reserved":"Цей нік зарезервовано","err_pass_bad":"Пароль: від 6 до 64 символів","err_nick_taken":"Цей нік уже зайнято","err_too_many":"Забагато спроб, зачекай хвилину","err_bad_creds":"Невірний нік або пароль","err_need_login":"Потрібно увійти знову","err_bad_fighter":"Невірний вибір бійця","err_char_exists":"Персонаж уже створено","err_unavailable":"Світ тимчасово недоступний, спробуй за хвилину","err_server_error":"Помилка сервера","err_net":"Помилка зв’язку"},"en":{"tagline":"Street fights online","play":"PLAY","tab_reg":"Sign up","tab_log":"Log in","nick":"Nickname","nick_ph":"e.g. Tiger_77","nick_hint":"3–16 characters: letters, digits and _ · nickname is unique","pass":"Password","pass_ph":"6+ characters","pass_warn":"⚠ Remember your password: without email it can’t be recovered.","btn_reg":"Create account","btn_log":"Log in","choose_title":"CHOOSE YOUR FIGHTER","choose_sub":"Starting stats depend on the fighter. You can’t change this later.","go_world":"Enter the world!","st_str":"Strength","st_hp":"Health","st_spd":"Speed","f_brute_arms":"Bruiser","f_bancho":"Thug","f_batting_girl":"Girl with a bat","f_brawler_girl":"Street brawler","z0":"Dark Alley","z1":"Brick Street","z2":"Garage","z3":"PLAZA","z4":"Pizzeria","z5":"Window Street","z6":"Night Club","lbl_safe":"SAFE","lbl_consent":"BY CONSENT","lbl_danger":"DANGER","sub_hub":"no fighting","sub_safe":"bots only, no player fights","sub_consent":"player fights only by accepted challenge","sub_danger":"no rules — anyone can be attacked","pill":"lv.","lvl_big":"LV.","xp":"XP {0} / {1}","points":"★ Points: {0}","duel_hud":"⚔ Duel: {0}","menu":"☰ Character","walk":"MOVE","btn_hit":"PUNCH","btn_kick":"KICK","btn_block":"BLOCK","hint1":"← → ↑ ↓ / WASD — move, Shift — run","hint2":"J — punch   K — kick   Space — block","hint3":"E — nearby player   Tab — character","connecting":"Connecting to the world…","ko":"KNOCKOUT","lvlup":"LEVEL UP: {0}","lvlup_sub":"+{0} stat points","block_dmg":"BLOCK −{0}","bot_prefix":"Bot · ","fighter_lbl":"Fighter: ","card_bot":"It’s a bot — hit it!","duel_btn":"⚔ Challenge to a duel","lvl_word":"lv. {0}","panel_title":"Character: {0}","panel_info":"Level {0}    •    Free points: {1}","d_str":"punch damage","d_hp":"max health","d_spd":"walk and run speed","no_reset":"Points can’t be reset — choices are final","logout":"Log out","inv_title":"⚔ {0} challenges you to a duel","accept":"Accept","decline":"Decline","nobody":"Nobody nearby","no_card_combat":"Card unavailable during combat","duel_with":"Duel with {0}!","m_consent_only":"Fights here are by challenge only — tap a player","m_no_fight":"No fighting in this district","m_ko_respawn":"You were knocked out — respawning at the plaza","m_win_over":"Victory over {0}!","m_duel_interrupted":"Duel interrupted","m_duel_timeout":"Duel ended by timeout","m_duel_only_consent":"Duels are only in “by consent” districts","m_other_zone":"Player is in another district","m_already_dueling":"One of you is already in a duel","m_already_invited":"A challenge was already sent","m_invite_sent":"Challenge sent: {0}","m_declined":"{0} declined the duel","need_login_msg":"Please log in again","btn_ok":"OK","kicked":"You logged in from another device","play_here":"Play here","fs_title":"Fullscreen","understood":"Got it","ios_help":"On iPhone the browser can’t show the game fullscreen.\n\nDo this once:\n1. Tap “Share” (square with an arrow)\n2. Choose “Add to Home Screen”\n3. Launch the game from the new icon — it opens without browser bars","err_nick_bad":"Nickname: 3–16 characters, letters, digits and _ only","err_nick_reserved":"This nickname is reserved","err_pass_bad":"Password: 6 to 64 characters","err_nick_taken":"This nickname is taken","err_too_many":"Too many attempts, wait a minute","err_bad_creds":"Wrong nickname or password","err_need_login":"Please log in again","err_bad_fighter":"Invalid fighter","err_char_exists":"Character already created","err_unavailable":"The world is temporarily unavailable, try again in a minute","err_server_error":"Server error","err_net":"Connection error"}};
+let lang = 'en';
+try { lang = localStorage.getItem('world_lang'); } catch(_){}
+if (!L[lang]){ const n = (navigator.language || '').toLowerCase(); lang = n.startsWith('uk') ? 'uk' : n.startsWith('ru') ? 'ru' : 'en'; }
+Object.assign(L.ru, {"lbl_wild":"ДИКИЙ","lbl_wild2":"ДИКИЙ · ЖЁСТКИЙ","sub_wild":"бей любого, кроме своего клана","sub_wild2":"то же, но панков и опыта больше","clan_btn":"🛡 Клан","clan_title":"Клан","clan_none":"Ты пока не в клане","clan_create_btn":"Создать клан","clan_form_title":"СОЗДАНИЕ КЛАНА","clan_name":"Название клана","clan_name_ph":"например Legion","clan_tag":"Тег (2–4 символа)","clan_tag_ph":"LNG","clan_create_go":"Создать","cancel":"Отмена","clan_members":"Участники: {0}","clan_leave_btn":"Выйти из клана","clan_hint_invite":"Пригласить: нажми на игрока → «Пригласить в клан»","clan_invites":"Приглашения: {0}","clan_more":"ещё +{0}","clan_invite_btn":"🛡 Пригласить в клан","clan_card_ally":"Твой клан","clan_card_hint_noclan":"Создай клан в меню «🛡 Клан»","clan_card_hint_noleader":"Приглашать может лидер клана","ce_clan_name_bad":"Название: 3–20 символов — буквы, цифры, _ и пробел","ce_clan_tag_bad":"Тег: 2–4 символа, только буквы и цифры","ce_clan_name_taken":"Такое название уже занято","ce_clan_tag_taken":"Такой тег уже занят","m_clanmate":"Это твой клан — соклановцев бить нельзя","m_clan_in_clan":"Ты уже в клане","m_clan_not_leader":"Приглашать может только лидер клана","m_clan_already_member":"{0} уже в твоём клане","m_clan_invite_sent":"Приглашение отправлено: {0}","m_clan_invited":"[{0}] {1} приглашает тебя в клан — открой «🛡 Клан»","m_clan_joined":"Ты вступил в клан [{0}]","m_clan_left":"Ты вышел из клана","m_clan_kicked":"Тебя исключили из клана [{0}]","m_clan_created":"Клан [{0}] создан!","m_clan_pending":"Приглашений в клан: {0} — открой «🛡 Клан»"});
+Object.assign(L.ru, { f_enemy_punk:'Панк', f_bat_thug:'Бандит', f_ninja_boss:'Ниндзя', pass2:'Повтори пароль', pass2_ph:'ещё раз тот же пароль', err_pass_mismatch:'Пароли не совпадают', show_pass:'Показать пароль' });
+Object.assign(L.uk, {"lbl_wild":"ДИКИЙ","lbl_wild2":"ДИКИЙ · ЖОРСТКИЙ","sub_wild":"бий будь-кого, крім свого клану","sub_wild2":"те саме, але більше панків і досвіду","clan_btn":"🛡 Клан","clan_title":"Клан","clan_none":"Ти поки не в клані","clan_create_btn":"Створити клан","clan_form_title":"СТВОРЕННЯ КЛАНУ","clan_name":"Назва клану","clan_name_ph":"наприклад Legion","clan_tag":"Тег (2–4 символи)","clan_tag_ph":"LNG","clan_create_go":"Створити","cancel":"Скасувати","clan_members":"Учасники: {0}","clan_leave_btn":"Вийти з клану","clan_hint_invite":"Запросити: натисни на гравця → «Запросити в клан»","clan_invites":"Запрошення: {0}","clan_more":"ще +{0}","clan_invite_btn":"🛡 Запросити в клан","clan_card_ally":"Твій клан","clan_card_hint_noclan":"Створи клан у меню «🛡 Клан»","clan_card_hint_noleader":"Запрошувати може лідер клану","ce_clan_name_bad":"Назва: 3–20 символів — літери, цифри, _ та пробіл","ce_clan_tag_bad":"Тег: 2–4 символи, лише літери та цифри","ce_clan_name_taken":"Така назва вже зайнята","ce_clan_tag_taken":"Такий тег уже зайнятий","m_clanmate":"Це твій клан — соклановців бити не можна","m_clan_in_clan":"Ти вже в клані","m_clan_not_leader":"Запрошувати може лише лідер клану","m_clan_already_member":"{0} уже у твоєму клані","m_clan_invite_sent":"Запрошення надіслано: {0}","m_clan_invited":"[{0}] {1} запрошує тебе в клан — відкрий «🛡 Клан»","m_clan_joined":"Ти вступив у клан [{0}]","m_clan_left":"Ти вийшов з клану","m_clan_kicked":"Тебе виключили з клану [{0}]","m_clan_created":"Клан [{0}] створено!","m_clan_pending":"Запрошень у клан: {0} — відкрий «🛡 Клан»"});
+Object.assign(L.uk, { f_enemy_punk:'Панк', f_bat_thug:'Бандит', f_ninja_boss:'Ніндзя', pass2:'Повтори пароль', pass2_ph:'ще раз той самий пароль', err_pass_mismatch:'Паролі не збігаються', show_pass:'Показати пароль' });
+Object.assign(L.en, {"lbl_wild":"WILD","lbl_wild2":"WILD · HARSH","sub_wild":"attack anyone except your clan","sub_wild2":"same rules, but more punks and XP","clan_btn":"🛡 Clan","clan_title":"Clan","clan_none":"You are not in a clan yet","clan_create_btn":"Create a clan","clan_form_title":"CREATE A CLAN","clan_name":"Clan name","clan_name_ph":"e.g. Legion","clan_tag":"Tag (2–4 characters)","clan_tag_ph":"LNG","clan_create_go":"Create","cancel":"Cancel","clan_members":"Members: {0}","clan_leave_btn":"Leave clan","clan_hint_invite":"To invite: tap a player → “Invite to clan”","clan_invites":"Invitations: {0}","clan_more":"+{0} more","clan_invite_btn":"🛡 Invite to clan","clan_card_ally":"Your clan","clan_card_hint_noclan":"Create a clan in the “🛡 Clan” menu","clan_card_hint_noleader":"Only the clan leader can invite","ce_clan_name_bad":"Name: 3–20 characters — letters, digits, _ and space","ce_clan_tag_bad":"Tag: 2–4 characters, letters and digits only","ce_clan_name_taken":"This name is taken","ce_clan_tag_taken":"This tag is taken","m_clanmate":"That’s your clan — you can’t hit clanmates","m_clan_in_clan":"You are already in a clan","m_clan_not_leader":"Only the clan leader can invite","m_clan_already_member":"{0} is already in your clan","m_clan_invite_sent":"Invitation sent: {0}","m_clan_invited":"[{0}] {1} invites you to a clan — open “🛡 Clan”","m_clan_joined":"You joined clan [{0}]","m_clan_left":"You left the clan","m_clan_kicked":"You were removed from clan [{0}]","m_clan_created":"Clan [{0}] created!","m_clan_pending":"Clan invitations: {0} — open “🛡 Clan”"});
+Object.assign(L.en, { f_enemy_punk:'Punk', f_bat_thug:'Thug', f_ninja_boss:'Ninja', pass2:'Repeat password', pass2_ph:'same password again', err_pass_mismatch:'Passwords do not match', show_pass:'Show password' });
+Object.assign(L.ru, { f_fury:'Рыжая фурия' }); Object.assign(L.uk, { f_fury:'Руда фурія' }); Object.assign(L.en, { f_fury:'Red Fury' });
+Object.assign(L.ru, { btn_super:'СУПЕР', sec:'с', hint2:'J — удар   K — суперсила   Пробел — блок', m_super_wait:'Суперсила заряжается: ещё {0} с' });
+Object.assign(L.uk, { btn_super:'СУПЕР', sec:'с', hint2:'J — удар   K — суперсила   Пробіл — блок', m_super_wait:'Суперсила заряджається: ще {0} с' });
+Object.assign(L.en, { btn_super:'SUPER', sec:'s', hint2:'J — punch   K — super   Space — block', m_super_wait:'Super is charging: {0} s left' });
+Object.assign(L.ru, { door_enter:'Войти', door_exit:'Выйти', m_no_enter_combat:'Пока идёт драка с игроком, войти нельзя', hint3:'E — игрок рядом / дверь   Tab — персонаж' });
+Object.assign(L.uk, { door_enter:'Увійти', door_exit:'Вийти', m_no_enter_combat:'Поки триває бійка з гравцем, увійти не можна', hint3:'E — гравець поруч / двері   Tab — персонаж' });
+Object.assign(L.en, { door_enter:'Enter', door_exit:'Exit', m_no_enter_combat:'Can’t enter while fighting another player', hint3:'E — nearby player / door   Tab — character' });
+Object.assign(L.ru, { dmg_hint:'удар ~{0}   ·   супер ~{1}', lbl_str:'СИЛА', lbl_hp:'ЗДОРОВЬЕ {0} / {1}', lbl_run:'БЕГ {0} / {1}' });
+Object.assign(L.uk, { dmg_hint:'удар ~{0}   ·   супер ~{1}', lbl_str:'СИЛА', lbl_hp:'ЗДОРОВʼЯ {0} / {1}', lbl_run:'БІГ {0} / {1}' });
+Object.assign(L.en, { dmg_hint:'hit ~{0}   ·   super ~{1}', lbl_str:'STRENGTH', lbl_hp:'HEALTH {0} / {1}', lbl_run:'RUN {0} / {1}' });
+Object.assign(L.ru, { change_fighter_btn:'Сменить бойца', choose_sub_switch:'Уровень, опыт и характеристики остаются прежними — меняется только внешность. Следующая смена станет доступна через 7 дней.', btn_switch_go:'Сменить', err_fighter_cooldown:'Сменить бойца можно раз в 7 дней — осталось {0} дн.' });
+Object.assign(L.uk, { change_fighter_btn:'Змінити бійця', choose_sub_switch:'Рівень, досвід і характеристики лишаються ті самі — змінюється лише зовнішність. Наступна зміна стане доступна через 7 днів.', btn_switch_go:'Змінити', err_fighter_cooldown:'Змінювати бійця можна раз на 7 днів — лишилось {0} дн.' });
+Object.assign(L.en, { change_fighter_btn:'Change fighter', choose_sub_switch:'Level, XP and stats stay the same — only the look changes. Next change will be available in 7 days.', btn_switch_go:'Change', err_fighter_cooldown:'You can change fighter once every 7 days — {0} day(s) left' });
+Object.assign(L.ru, { chat_btn:'💬 Чат', chat_title:'💬 Общий чат', chat_ph:'Написать сообщение…', chat_send_btn:'Отправить' });
+Object.assign(L.uk, { chat_btn:'💬 Чат', chat_title:'💬 Загальний чат', chat_ph:'Написати повідомлення…', chat_send_btn:'Надіслати' });
+Object.assign(L.en, { chat_btn:'💬 Chat', chat_title:'💬 Global chat', chat_ph:'Write a message…', chat_send_btn:'Send' });
+Object.assign(L.ru, { snd_title:'Звуки игры вкл/выкл', music_title:'Музыка вкл/выкл', rules_title:'Правила игры' });
+Object.assign(L.uk, { snd_title:'Звуки гри увімк/вимк', music_title:'Музика увімк/вимк', rules_title:'Правила гри' });
+Object.assign(L.en, { snd_title:'Game sounds on/off', music_title:'Music on/off', rules_title:'Game rules' });
+Object.assign(L.ru, { rules_text:
+`🏙️ ПРАВИЛА МИРА
+
+• Площадь (центр карты) — тут бой запрещён, все свои
+• Дальше от центра — районы «дикие»: бить можно любого, кроме своего клана
+• Чем дальше — тем опаснее боты, но больше опыта
+
+• Сила и здоровье качаются без предела
+• Скорость — максимум до 100, дальше очки идут в силу/здоровье
+• Бег ограничен шкалой — тратится на бегу, восстанавливается на шаге
+
+• Клан может создать любой; соклановцы друг друга не бьют
+• Смерть — возрождение на площади, прогресс не теряется
+
+• Раз в 7 дней можно сменить бойца — уровень и статы сохраняются
+• Чат общий на весь мир — без цензуры, будь вежлив` });
+Object.assign(L.uk, { rules_text:
+`🏙️ ПРАВИЛА СВІТУ
+
+• Площа (центр карти) — тут бій заборонено, всі свої
+• Далі від центру — райони «дикі»: бити можна будь-кого, крім свого клану
+• Що далі — то небезпечніші боти, але більше досвіду
+
+• Сила і здоров'я качаються без обмежень
+• Швидкість — максимум до 100, далі очки йдуть у силу/здоров'я
+• Біг обмежений шкалою — витрачається на бігу, відновлюється на кроці
+
+• Клан може створити будь-хто; соклановці одне одного не б'ють
+• Смерть — відродження на площі, прогрес не втрачається
+
+• Раз на 7 днів можна змінити бійця — рівень і статистики зберігаються
+• Чат загальний на весь світ — без цензури, будь ввічливим` });
+Object.assign(L.ru, { mod_title:'Модерация', mod_minutes:'Минут', mod_hint:'Для бана 0 = навсегда', mod_mute_btn:'🔇 Замутить', mod_ban_btn:'⛔ Забанить', mod_btn:'🛡 Модерация', m_mod_you_muted:'Тебя замутили на {0} мин.', banned_perm_title:'Ты заблокирован навсегда', banned_until_title:'Ты заблокирован до {0}', mod_bad_minutes:'Укажи число минут (0 или больше)' });
+Object.assign(L.uk, { mod_title:'Модерація', mod_minutes:'Хвилин', mod_hint:'Для бану 0 = назавжди', mod_mute_btn:'🔇 Замутити', mod_ban_btn:'⛔ Забанити', mod_btn:'🛡 Модерація', m_mod_you_muted:'Тебе замутили на {0} хв.', banned_perm_title:'Тебе заблоковано назавжди', banned_until_title:'Тебе заблоковано до {0}', mod_bad_minutes:'Вкажи число хвилин (0 або більше)' });
+Object.assign(L.en, { mod_title:'Moderation', mod_minutes:'Minutes', mod_hint:'0 = permanent for ban', mod_mute_btn:'🔇 Mute', mod_ban_btn:'⛔ Ban', mod_btn:'🛡 Moderate', m_mod_you_muted:'You were muted for {0} min.', banned_perm_title:'You are permanently banned', banned_until_title:'You are banned until {0}', mod_bad_minutes:'Enter a number of minutes (0 or more)' });
+Object.assign(L.en, { rules_text:
+`🏙️ WORLD RULES
+
+• The plaza (map center) is safe — no fighting there
+• Farther from the center — "wild" districts: attack anyone except your clan
+• The farther out, the tougher the bots, but the more XP
+
+• Strength and health can be trained without limit
+• Speed caps at 100 — points beyond that go into strength/health
+• Running is limited by a stamina bar — drains while running, refills while walking
+
+• Anyone can create a clan; clanmates can't hit each other
+• Death respawns you at the plaza — no progress is lost
+
+• You can switch fighters once every 7 days — level and stats carry over
+• Chat is global and uncensored — be nice` });
+function t(k, ...a){
+  let s = (L[lang] && k in L[lang]) ? L[lang][k] : (k in L.ru ? L.ru[k] : k);
+  a.forEach((v, i) => { s = s.split('{' + i + '}').join(v); });
+  return s;
+}
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i]').forEach(el => { el.textContent = t(el.dataset.i); });
+  document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = t(el.dataset.ph); });
+  document.querySelectorAll('[data-title]').forEach(el => { el.title = t(el.dataset.title); el.setAttribute('aria-label', t(el.dataset.title)); });
+  document.querySelectorAll('.lang').forEach(b => b.classList.toggle('on', b.dataset.lang === lang));
+  if (typeof setMode === 'function') setMode(mode);
+}
+const errText = e => (e && e.code && L.ru['err_' + e.code]) ? t('err_' + e.code) : ((e && e.message) || t('err_net'));
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+
+// ── сцена ──
+const RX = 1280 - 16 - 56;   // правый край HUD (справа оставлено место под кнопку «на весь экран»)
+const S = 2.5, WALL_Y = 190, WALL_H = 96*S, ROAD_TOP = WALL_Y + WALL_H;
+let GROUND_MIN = 450, GROUND_MAX = 700, ZONE_W = 1800, WORLD_W = 1800*7;
+// мир — кольцо (21.09.2026, бесшовно, см. server/world.js): те же три функции, что на сервере.
+// camX и e.rx намеренно НЕ приводятся к [0,WORLD_W) — им дают "дрейфовать" (расти/убывать без
+// ограничений), а на экран переводят через nearestWrap относительно текущей камеры — так камера
+// и все актёры проходят через стык мира без скачка/рывка.
+const wrapX     = x => ((x % WORLD_W) + WORLD_W) % WORLD_W;
+const wrapDelta = (a, b) => { let d = (b - a) % WORLD_W; if (d > WORLD_W/2) d -= WORLD_W; else if (d < -WORLD_W/2) d += WORLD_W; return d; };
+const nearestWrap = (x, ref) => x - Math.round((x - ref) / WORLD_W) * WORLD_W;
+const TILESET = new Image(); TILESET.src = 'sprites/streets_of_fight/stage/tileset.png';
+const BACK    = new Image(); BACK.src    = 'sprites/streets_of_fight/stage/back.png';
+const FORE    = new Image(); FORE.src    = 'sprites/streets_of_fight/stage/fore.png';
+const T = {
+  pizza:{sx:0,sy:0,sw:224,sh:96}, window:{sx:288,sy:0,sw:224,sh:96},
+  brick:{sx:0,sy:112,sw:48,sh:96}, smallbrick:{sx:64,sy:112,sw:48,sh:96}, pipe:{sx:128,sy:112,sw:48,sh:96},
+  archwin:{sx:192,sy:112,sw:48,sh:96}, door:{sx:256,sy:112,sw:48,sh:96}, brick2:{sx:320,sy:112,sw:32,sh:96},
+  garageCar:{sx:176,sy:224,sw:112,sh:144}, garageShut:{sx:304,sy:224,sw:112,sh:144}, graffiti:{sx:432,sy:224,sw:96,sh:144},
+};
+const ROAD = {sx:48,sy:224,sw:112,sh:144}, LAMP = {sx:16,sy:0,sw:42,sh:144};
+const TYPES = {
+  hub:     { get label(){ return t('lbl_safe'); },    get sub(){ return t('sub_hub'); },     color:'#3ddc84', tint:null },
+  safe:    { get label(){ return t('lbl_safe'); },    get sub(){ return t('sub_safe'); },    color:'#3ddc84', tint:null },
+  wild:    { get label(){ return t('lbl_wild'); },    get sub(){ return t('sub_wild'); },    color:'#ff9d2e', tint:'rgba(90,50,0,0.18)' },
+  wild2:   { get label(){ return t('lbl_wild2'); },   get sub(){ return t('sub_wild2'); },   color:'#ff4a4a', tint:'rgba(110,0,0,0.26)' },
+};
+const ZONES = [
+  { get name(){ return t('z0'); }, type:'wild2',   seq:['smallbrick','smallbrick','pipe','smallbrick','archwin','smallbrick','door','smallbrick','smallbrick'], tint:'rgba(20,40,20,0.28)' },
+  { get name(){ return t('z1'); }, type:'wild',    seq:['brick','brick2','brick','archwin','brick2','brick','door'] },
+  { get name(){ return t('z2'); },           type:'safe',    seq:['brick','garageCar','brick2','garageShut','brick','graffiti','smallbrick'] },
+  { get name(){ return t('z3'); },         type:'hub',     seq:['window','pizza','window'] },
+  { get name(){ return t('z4'); },        type:'safe',    seq:['pizza','window'] },
+  { get name(){ return t('z5'); },  type:'wild',    seq:['window','window','archwin','window','window','door'] },
+  { get name(){ return t('z6'); },     type:'wild2',   seq:['brick'], tint:'rgba(70,0,70,0.28)', neon:true },
+];
+const zoneAt = x => Math.min(ZONES.length-1, Math.floor(wrapX(x) / ZONE_W));
+
+// ── бойцы: [папка, префикс, кадров, fps] ──
+const A = {
+  brute_arms:   { base:'urban_brawlers',   get name(){ return t('f_brute_arms'); },
+    idle:['Idle','idle',8,9],  walk:['Walk','walk',6,11], jab:['Jab','jab',7,14],  punch:['Punch','punch',5,16], kick:['Kick','kick',8,16],  hurt:['Hurt','hurt',4,12] },
+  bancho:       { base:'urban_brawlers',   get name(){ return t('f_bancho'); },
+    idle:['Idle','idle',7,9],  walk:['Walk','walk',6,12], jab:['Jab','jab',9,18],  punch:['Punch','punch',7,18], kick:['Kick','kick',8,18],  hurt:['Hurt','hurt',4,12] },
+  batting_girl: { base:'urban_brawlers',   get name(){ return t('f_batting_girl'); },
+    idle:['Idle','idle',15,10],walk:['Walk','walk',6,12], jab:['Jab','jab',5,18],  punch:['Punch','punch',8,18], kick:['Kick','kick',11,20], hurt:['Hurt','hurt',4,12] },
+  brawler_girl: { base:'streets_of_fight', get name(){ return t('f_brawler_girl'); },
+    idle:['Idle','idle',4,8],  walk:['Walk','walk',10,12],jab:['Jab','jab',3,16],  punch:['Punch','punch',3,16], kick:['Kick','kick',5,16],  hurt:['Hurt','hurt',2,12] },
+};
+A.fury = { base:'action_girl', lying:true, get name(){ return t('f_fury'); },
+    idle:['Idle','idle',2,3],  walk:['Walk','walk',6,11], jab:['Jab','jab',2,12], punch:['Punch','punch',4,16], kick:['Kick','kick',4,14], hurt:['Hurt','hurt',6,8] };
+A.enemy_punk = { base:'streets_of_fight', left:true, lying:true, get name(){ return t('f_enemy_punk'); },
+    idle:['Idle','idle',4,8], walk:['Walk','walk',4,10], jab:['Punch','punch',3,16], punch:['Punch','punch',3,16], kick:['Punch','punch',3,16], hurt:['Hurt','hurt',4,12] };
+A.bat_thug = { base:'martial_hero3', lying:true, get name(){ return t('f_bat_thug'); },
+    idle:['Idle','idle',10,8], walk:['Walk','walk',8,10], jab:['Punch','punch',7,16], punch:['Punch','punch',7,16], kick:['Punch','punch',7,16], hurt:['Hurt','hurt',11,12] };
+A.ninja_boss = { base:'martial_hero2', lying:true, get name(){ return t('f_ninja_boss'); },
+    idle:['Idle','idle',4,8], walk:['Walk','walk',8,10], jab:['Punch','punch',4,16], punch:['Punch','punch',4,16], kick:['Punch','punch',4,16], hurt:['Hurt','hurt',7,12] };
+const VARIANT_DIRS = {
+  enemy_punk:   ['enemy_punk','enemy_punk_v4_teal','enemy_punk_v6_purple'],
+  bat_thug:     ['bat_thug','bat_thug_v4_teal','bat_thug_v6_purple'],
+  ninja_boss:   ['ninja_boss'],
+  brute_arms:   ['brute_arms','brute_arms_v3_green','brute_arms_v5_blue'],
+  bancho:       ['bancho','bancho_v4_teal','bancho_v6_purple'],
+  batting_girl: ['batting_girl','batting_girl_v2_yellowgreen','batting_girl_v7_pink'],
+  brawler_girl: ['brawler_girl','brawler_girl_v5_blue','brawler_girl_v6_purple'],
+  fury:         ['fury','fury_v4_teal','fury_v6_purple'],
+};
+const ST = { idle:0, walk:1, jab:2, punch:3, kick:4, hurt:5, ko:6, block:7 };
+const ST_ANIM = ['idle','walk','jab','punch','kick','hurt','hurt','idle'];
+const _fc = {};
+function framesOf(type, variant, anim){
+  const dir = VARIANT_DIRS[type][variant] || VARIANT_DIRS[type][0];
+  const k = dir+'|'+anim;
+  if (_fc[k]) return _fc[k];
+  const [folder, prefix, n] = A[type][anim], out = [];
+  for (let i=1;i<=n;i++){ const im = new Image(); im.src = `sprites/${A[type].base}/${dir}/${folder}/${prefix}${i}.png`; out.push(im); }
+  return _fc[k] = out;
+}
+const spriteUrl = (type, variant) => `sprites/${A[type].base}/${VARIANT_DIRS[type][variant]}/Idle/idle1.png`;
+
+// ═══════════════ ВХОД / РЕГИСТРАЦИЯ ═══════════════
+let mode = 'reg', token = null, cfg = null, pick = { type:null, variant:0 }, switchingFighter = false;
+try { token = localStorage.getItem('world_token'); } catch(_){}
+const api = async (path, body, auth) => {
+  const opt = { method: body ? 'POST' : 'GET', headers: {} };
+  if (body){ opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  if (auth && token) opt.headers.Authorization = 'Bearer ' + token;
+  let r; try { r = await fetch('/world-api/' + path, opt); } catch(_){ const ne = new Error(''); ne.code = 'net'; throw ne; }
+  let data = {}; try { data = await r.json(); } catch(_){}
+  if (!r.ok) { const e = new Error(data.error || ''); e.code = data.code || 'net'; e.status = r.status; throw e; }
+  return data;
+};
+function setMode(m){
+  mode = m;
+  $('tabReg').classList.toggle('on', m==='reg'); $('tabLog').classList.toggle('on', m==='log');
+  $('go').textContent = m==='reg' ? t('btn_reg') : t('btn_log');
+  $('passWarn').style.display = $('nickHint').style.display = $('pass2Box').style.display = m==='reg' ? '' : 'none';
+  $('pass').autocomplete = m==='reg' ? 'new-password' : 'current-password';
+  $('err').textContent = '';
+}
+$('tabReg').onclick = () => setMode('reg'); $('tabLog').onclick = () => setMode('log');
+async function submitAuth(){
+  const nick = $('nick').value.trim(), pass = $('pass').value;
+  $('err').textContent = '';
+  if (mode === 'reg' && pass !== $('pass2').value){ $('err').textContent = t('err_pass_mismatch'); return; }
+  $('go').disabled = true;
+  try {
+    const r = await api(mode==='reg' ? 'register' : 'login', { nick, pass });
+    token = r.token; try { localStorage.setItem('world_token', token); } catch(_){}
+    r.hasChar ? enterGame() : showCreate();
+  } catch(e){ $('err').textContent = errText(e); }
+  $('go').disabled = false;
+}
+$('go').onclick = submitAuth;
+$('pass').addEventListener('keydown', e => { if (e.key === 'Enter'){ if (mode === 'reg') $('pass2').focus(); else submitAuth(); } });
+$('pass2').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+$('eye').onclick = () => { const on = !$('eye').classList.contains('on'); $('eye').classList.toggle('on', on); $('pass').type = $('pass2').type = on ? 'text' : 'password'; };
+$('nick').addEventListener('keydown', e => { if (e.key === 'Enter') $('pass').focus(); });
+
+async function showCreate(){
+  $('scrAuth').hidden = true; $('scrCreate').hidden = false;
+  $('createCancel').hidden = !switchingFighter;
+  $('createTitle').textContent = switchingFighter ? t('change_fighter_btn') : t('choose_title');
+  $('createSub').textContent = switchingFighter ? t('choose_sub_switch') : t('choose_sub');
+  $('start').textContent = switchingFighter ? t('btn_switch_go') : t('go_world');
+  if (!cfg) cfg = await api('config');
+  const box = $('cards'); box.innerHTML = '';
+  const my = switchingFighter ? myEnt() : null;
+  const curType = my ? my.ty : cfg.fighters[0].type, curVar = my ? (my.v || 0) : 0;
+  cfg.fighters.forEach((f, i) => {
+    const on = f.type === curType;
+    const el = document.createElement('div'); el.className = 'card' + (on ? ' on' : '');
+    el.innerHTML = `<img src="${spriteUrl(f.type, 0)}"><div class="nm">${t('f_' + f.type)}</div>
+      ${[[t('st_str'),'str','#ff8a4a'],[t('st_hp'),'hp','#4be06f'],[t('st_spd'),'spd','#5fc8ff']].map(([n,k,c]) =>
+        `<div class="st"><span>${n}</span><i style="width:${f.stats[k]*8}px;background:${c}"></i>${f.stats[k]}</div>`).join('')}
+      <div class="sw">${[0,1,2].map(v => `<img data-v="${v}" class="${v===(on?curVar:0)?'on':''}" src="${spriteUrl(f.type, v)}">`).join('')}</div>`;
+    el.onclick = e => {
+      box.querySelectorAll('.card').forEach(c => c.classList.remove('on')); el.classList.add('on');
+      pick.type = f.type;
+      if (e.target.dataset && e.target.dataset.v !== undefined){
+        pick.variant = +e.target.dataset.v;
+        el.querySelectorAll('.sw img').forEach(im => im.classList.toggle('on', +im.dataset.v === pick.variant));
+      } else pick.variant = +(el.querySelector('.sw img.on').dataset.v);
+    };
+    box.appendChild(el);
+  });
+  pick = { type: curType, variant: curVar };
+}
+function openFighterSwitch(){ switchingFighter = true; $('ov').hidden = false; showCreate(); }
+$('createCancel').onclick = () => { switchingFighter = false; $('ov').hidden = true; };
+$('start').onclick = async () => {
+  $('err2').textContent = ''; $('start').disabled = true;
+  if (switchingFighter){ sendWs({ t:'change_fighter', type:pick.type, variant:pick.variant }); return; }   // ответ — case 'fighter_change_ok'/'fighter_change_err'
+  try { await api('create', { type: pick.type, variant: pick.variant }, true); enterGame(); }
+  catch(e){ $('err2').textContent = errText(e); if (e.status === 401) logout(); }
+  $('start').disabled = false;
+};
+function logout(){ try { localStorage.removeItem('world_token'); } catch(_){} location.reload(); }
+function showMsg(text, btn, fn){
+  $('msgText').textContent = text; $('msgBtn').textContent = btn || t('btn_ok'); $('msg').hidden = false;
+  $('msgBtn').onclick = fn || (() => { $('msg').hidden = true; });
+}
+// клик мимо текста (по тёмному фону) тоже закрывает — раньше единственным выходом была кнопка
+// внутри окна, а если контент не помещался на экране, до неё было не долистать/не дотянуться
+$('msg').addEventListener('click', e => { if (e.target === $('msg')) $('msg').hidden = true; });
+
+// ═══════════════ СЕТЬ ═══════════════
+let ws = null, myId = 0, connected = false, retry = 0, gameStarted = false, stopRetry = false;
+const ents = new Map();            // id → сущность
+const SUPER_COOLDOWN = 60;                                        // секунд, как на сервере
+const me = { mo:0, su:0, suStamp:0, sp:240, stm:100, dh:0, ds:0, x:0, y:600, f:1, xp:0, need:50, pt:0, st:{str:1,hp:1,spd:1}, sent:'', sentAt:0, wasMoving:false, moving:false };
+const ui = { hits:[], toasts:[], floaters:[], chatFeed:[], banner:null, card:null, panel:false, touch:false, koText:0, fade:0, clanPanel:false, clanScroll:0, mapExpanded:false };
+
+function enterGame(){
+  $('ov').hidden = true; document.body.classList.add('ingame');
+  if (!gameStarted){ gameStarted = true; requestAnimationFrame(frame); }
+  connect();
+}
+let lastBanUntil;   // undefined = не приходило; null = навсегда; число = мс
+function connect(){
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/world-ws?token=' + encodeURIComponent(token));
+  ws.onopen = () => { retry = 0; };
+  ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch(_){ return; } onServer(m); };
+  ws.onclose = ev => {
+    connected = false;
+    if (stopRetry) return;
+    if (ev.code === 4001){ showMsg(t('need_login_msg'), t('btn_log'), logout); return; }
+    if (ev.code === 4002){ document.body.classList.remove('ingame'); $('ov').hidden = false; $('scrAuth').hidden = true; showCreate(); return; }
+    if (ev.code === 4004){ stopRetry = true; showMsg(t('kicked'), t('play_here'), () => location.reload()); return; }
+    if (ev.code === 4005){
+      stopRetry = true;
+      const text = lastBanUntil ? t('banned_until_title', new Date(lastBanUntil).toLocaleString()) : t('banned_perm_title');
+      showMsg(text, t('btn_ok'), () => location.reload());
+      return;
+    }
+    retry++; setTimeout(connect, Math.min(5000, 500 * retry));
+  };
+}
+let isMod = false;
+function sendWs(o){ if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+
+function onServer(m){
+  switch (m.t){
+    case 'hello':
+      myId = m.id; isMod = !!m.mod; ZONE_W = m.zoneW; WORLD_W = m.world; GROUND_MIN = m.ground[0]; GROUND_MAX = m.ground[1];
+      for (let i=0;i<m.zones.length;i++) if (ZONES[i]) ZONES[i].type = m.zones[i];
+      ents.clear(); me.x = m.x; me.y = m.y; camX = me.x - CW/2; connected = true; break;
+    case 'add':
+      for (const a of m.e){ const e = ents.get(a.id) || { id:a.id, rx:0, ry:0, x:0, y:0, f:1, s:0, ps:0, t:0, h:1, m:1, l:1, c:0, init:false };
+        e.n = a.n; e.ty = a.ty; e.v = a.v; e.k = a.k; ents.set(a.id, e); }
+      break;
+    case 's': {
+      for (const r of m.a){
+        const e = ents.get(r[0]); if (!e) continue;
+        e.x = r[1]; e.y = r[2]; e.f = r[3];
+        if (e.s !== r[4]){
+          if (r[4] === ST.ko && e.s !== ST.ko) playKo(hearVol(e.x, e.y));   // нокаут — свой или чужой поблизости
+          e.s = r[4]; e.t = 0;
+        }
+        e.h = r[5]; e.m = r[6]; e.l = r[7]; e.c = r[8]; e.cl = r[9] || 0;
+        if (!e.init){ e.rx = e.x; e.ry = e.y; e.init = true; }
+        if (e.id === myId){
+          const ddx = wrapDelta(me.x, e.x), ddy = e.y - me.y, d = Math.hypot(ddx, ddy);
+          const locked = e.s === ST.hurt || e.s === ST.ko;
+          if (d > 160){ me.x = e.x; me.y = e.y; }
+          else if (me.moving || locked){ me.x = wrapX(me.x + ddx * 0.35); me.y += ddy * 0.35; }
+          // стоим на месте и не в нокдауне — НЕ подтягиваем к серверной позиции: она ещё пару тиков "доезжает"
+          // по инерции сети после отпускания кнопки, и как раз это подтягивание ощущается как скольжение
+        }
+      }
+      for (const id of m.rm) ents.delete(id);
+      for (const v of m.ev){
+        const e = ents.get(v[0]); if (!e) continue;
+        floater(e, v[2] ? t('block_dmg', v[1]) : '−'+v[1], v[2] ? '#7ec8ff' : (e.id === myId ? '#ff5a5a' : '#ffe14a'));
+        playHit(hearVol(e.x, e.y), !!v[2]);   // удар — свой или чужой поблизости, громкость по расстоянию
+      }
+      if ((m.me.rm || '') !== room) changeRoom(m.me.rm || '');
+      Object.assign(me, { mo:m.me.mo, su:m.me.su, suStamp:performance.now(), sp:m.me.sp, stm:m.me.stm, xp:m.me.xp, need:m.me.need, pt:m.me.pt, st:m.me.st, dh:m.me.dh, ds:m.me.ds });
+      break;
+    }
+    case 'money': { const e = ents.get(m.id) || myEnt(); if (e) floater(e, (m.d > 0 ? '+$' : '−$') + Math.abs(m.d), m.d > 0 ? '#7dff9a' : '#ff5a5a'); break; }
+    case 'toast': toast(t('m_' + m.k, ...(m.a || [])), m.color); break;
+    case 'lvl': ui.banner = { text:t('lvlup', m.level), sub:t('lvlup_sub', m.points), t:2.6 }; break;
+    case 'ko': ui.koText = 2; ui.card = null; break;
+    case 'card': ui.card = m; ui.panel = false; break;
+    case 'clans': Object.assign(clanTags, m.m); break;
+    case 'mm': miniPlayers = m.p; break;
+    case 'clan':
+      clanState.clan = m.clan; clanState.invites = m.invites;
+      if (clanState.first){ clanState.first = false; if (m.invites.length) toast(t('m_clan_pending', m.invites.length), '#7dc8ff'); }
+      break;
+    case 'clan_err': $('cErr').textContent = t('ce_' + m.code); $('cGo').disabled = false; break;
+    case 'clan_ok': $('clanForm').hidden = true; break;
+    case 'fighter_change_ok': switchingFighter = false; $('ov').hidden = true; $('start').disabled = false; break;
+    case 'fighter_change_err': $('err2').textContent = m.code === 'cooldown' ? t('err_fighter_cooldown', m.days) : t('err_bad_fighter'); $('start').disabled = false; break;
+    case 'chat_history': $('chatLog').innerHTML = ''; m.list.forEach(c => appendChatMsg(c.u, c.m)); break;
+    case 'chat_msg':
+      appendChatMsg(m.u, m.m);
+      if (!chatOpen) chatUnread++;
+      ui.chatFeed.push({ u:m.u, text:m.m, t:5 }); if (ui.chatFeed.length > 4) ui.chatFeed.shift();
+      playChatDing();
+      break;
+    case 'ban_info': lastBanUntil = m.until; break;
+    case 'chat_muted': toast(t('m_mod_you_muted', Math.max(1, Math.ceil((m.until - Date.now())/60000))), '#ff8a8a'); break;
+    case 'admin_stats': admData = m; renderAdm(); break;
+    case 'admin_hide_ok': admReq(); break;
+    case 'mod_ok': toast('✓ ' + m.action + ' — ' + m.nick, '#7dff9a'); break;
+    case 'kicked': break;
+  }
+}
+const myEnt = () => ents.get(myId);
+// Дебаг-режим баланса: только этому нику сервер разрешит менять себе статы
+// (проверка тут — только чтобы не рисовать лишние кнопки остальным, сервер всё равно перепроверяет)
+const DEBUG_OWNER_NICK = 'leha_neploxo';
+const isDebugOwner = () => { const e = myEnt(); return !!(e && e.n && e.n.toLowerCase() === DEBUG_OWNER_NICK); };
+const inCombat = () => { const e = myEnt(); return !!(e && e.c); };
+const maxHpMe = () => { const e = myEnt(); return e ? e.m : 100; };
+
+// ═══════════════ ВВОД ═══════════════
+const keys = {};
+const joy = { active:false, id:-1, ox:0, oy:0, x:0, y:0, vx:0, vy:0 };
+const btns = [
+  { name:'hit',   x:1170, y:590, r:72, get label(){ return t('btn_hit'); },  col:'#ff6b3d', down:false },
+  { name:'super', x:1040, y:648, r:58, get label(){ return t('btn_super'); }, col:'#ffc933', down:false },
+  { name:'block', x:1180, y:452, r:54, get label(){ return t('btn_block'); },  col:'#4aa8ff', down:false },
+];
+let blockHeld = false;
+const KEY_ACTION = { KeyJ:'hit', KeyZ:'hit', KeyK:'super', KeyX:'super' };
+addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Tab'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keys[e.code] = true;
+  if (KEY_ACTION[e.code]) doAction(KEY_ACTION[e.code]);
+  if (e.code === 'Tab') { ui.panel = !ui.panel; ui.card = null; ui.clanPanel = false; }
+  if (e.code === 'KeyE'){
+    const ds = doorState(); if (ds){ doorGo(ds); return; }
+    let best = null, bd = 240;
+    for (const a of ents.values()){ if (a.id === myId) continue; const d = Math.hypot(wrapDelta(me.x,a.x), (a.y-me.y)*2); if (d < bd){ bd = d; best = a; } }
+    if (best) askCard(best); else toast(t('nobody'));
+  }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+function doAction(n){ if (n === 'hit') sendWs({ t:'atk', k:'jab' }); else if (n === 'super') sendWs({ t:'atk', k:'super' }); }
+
+const isRotated = () => document.body.classList.contains('ingame') && matchMedia('(orientation: portrait)').matches;
+const toCanvas = e => {
+  const r = canvas.getBoundingClientRect();
+  // повёрнутый на 90° по часовой холст: верх холста — справа на экране, левый край холста — вверху
+  if (isRotated()) return { x:(e.clientY-r.top)/r.height*CW, y:(1-(e.clientX-r.left)/r.width)*CH };
+  return { x:(e.clientX-r.left)*CW/r.width, y:(e.clientY-r.top)*CH/r.height };
+};
+const ptrs = new Map();
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+  const p = toCanvas(e);
+  if (e.pointerType === 'touch') ui.touch = true;
+  for (let i = ui.hits.length-1; i>=0; i--){
+    const h = ui.hits[i];
+    if (p.x>=h.x && p.x<=h.x+h.w && p.y>=h.y && p.y<=h.y+h.h){ ptrs.set(e.pointerId, {kind:'ui'}); h.fn(); return; }
+  }
+  if (ui.touch || e.pointerType === 'mouse'){
+    for (const b of btns) if (Math.hypot(p.x-b.x, p.y-b.y) <= b.r*1.15){
+      b.down = true; ptrs.set(e.pointerId, {kind:'btn', b});
+      if (b.name === 'block') blockHeld = true; else doAction(b.name);
+      return;
+    }
+  }
+  if (e.pointerType !== 'mouse' && p.x < CW/2 && !joy.active){
+    Object.assign(joy, { active:true, id:e.pointerId, ox:p.x, oy:p.y, x:p.x, y:p.y, vx:0, vy:0 });
+    ptrs.set(e.pointerId, {kind:'joy', t0:performance.now(), p0:p}); return;
+  }
+  ptrs.set(e.pointerId, {kind:'tap', t0:performance.now(), p0:p});
+});
+canvas.addEventListener('pointermove', e => {
+  const s = ptrs.get(e.pointerId); if (!s || s.kind !== 'joy') return;
+  const p = toCanvas(e); joy.x = p.x; joy.y = p.y;
+  const dx = p.x-joy.ox, dy = p.y-joy.oy, len = Math.hypot(dx,dy), R = 70;
+  if (len < 10){ joy.vx = joy.vy = 0; } else { const m = Math.min(1, len/R); joy.vx = dx/len*m; joy.vy = dy/len*m; }
+});
+function endPointer(e){
+  const s = ptrs.get(e.pointerId); if (!s) return; ptrs.delete(e.pointerId);
+  const p = toCanvas(e), quick = performance.now()-s.t0 < 300 && s.p0 && Math.hypot(p.x-s.p0.x, p.y-s.p0.y) < 14;
+  if (s.kind === 'joy'){ joy.active = false; joy.vx = joy.vy = 0; if (quick) tapWorld(p.x, p.y); }
+  else if (s.kind === 'btn'){ s.b.down = false; if (s.b.name === 'block') blockHeld = false; }
+  else if (s.kind === 'tap' && quick) tapWorld(p.x, p.y);
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+const actorK = e => room === 'club' ? clubPersp(e.ry) : room === 'garage' ? garagePersp(e.ry) : room === 'pizzeria' ? pizzeriaPersp(e.ry) : 0.9 + 0.16 * (e.ry - 500) / 200;   // перспектива: ниже по экрану — чуть крупнее (диапазон 500..700 как раньше, выше 500 — мельче)
+const FIGHTER_H = 160;
+function tapWorld(x, y){
+  let hit = null;
+  for (const a of ents.values()){
+    const k = actorK(a), h = FIGHTER_H*k, sx = nearestWrap(a.rx, camX) - camX;
+    if (Math.abs(x-sx) < 55*k && y > a.ry-h-24 && y < a.ry+12 && (!hit || a.ry > hit.ry)) hit = a;
+  }
+  if (!hit){ ui.card = null; return; }
+  if (hit.id === myId){ ui.panel = true; return; }
+  askCard(hit);
+}
+function askCard(a){
+  if (inCombat()){ toast(t('no_card_combat'), '#ffc933'); return; }
+  sendWs({ t:'inspect', id:a.id });
+}
+
+// ── КЛАН: состояние и панель ──
+// Клан постоянный. Создаёт любой; приглашает только лидер (нажать на игрока → «Пригласить в клан»);
+// приглашения хранятся на сервере без срока — принять можно когда угодно (красная точка на кнопке «Клан»).
+const clanState = { clan:null, invites:[], first:true };
+let miniPlayers = [];                                  // положения всех остальных игроков для мини-карты: [x, соклановец?]
+const clanTags = {};                                   // clanId → тег (приходит от сервера)
+const myClanId = () => clanState.clan ? clanState.clan.id : 0;
+function openClanPanel(){ ui.clanPanel = true; ui.panel = false; ui.card = null; ui.clanScroll = 0; sendWs({ t:'clan_info' }); }
+function openClanForm(){ $('cErr').textContent = ''; $('cGo').disabled = false; $('clanForm').hidden = false; setTimeout(() => $('cName').focus(), 50); }
+$('cCancel').onclick = () => { $('clanForm').hidden = true; };
+$('cGo').onclick = () => { $('cErr').textContent = ''; $('cGo').disabled = true; sendWs({ t:'clan_create', name:$('cName').value, tag:$('cTag').value }); };
+$('cTag').addEventListener('keydown', e => { if (e.key === 'Enter') $('cGo').click(); });
+canvas.addEventListener('wheel', e => { if (ui.clanPanel){ ui.clanScroll += e.deltaY > 0 ? 1 : -1; e.preventDefault(); } }, { passive:false });
+
+// ── Общий чат: сворачиваемое окно, бейдж с непрочитанными на кнопке, пока свёрнуто ──
+let chatOpen = false, chatUnread = 0;
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function appendChatMsg(u, m){
+  const row = document.createElement('div'); row.className = 'cm';
+  row.innerHTML = `<b>${escapeHtml(u)}:</b> ${escapeHtml(m)}`;
+  $('chatLog').appendChild(row);
+  $('chatLog').scrollTop = $('chatLog').scrollHeight;
+}
+function openChat(){ chatOpen = true; chatUnread = 0; $('chatForm').hidden = false; setTimeout(() => $('chatInput').focus(), 50); }
+$('chatClose').onclick = () => { chatOpen = false; $('chatForm').hidden = true; };
+function sendChat(){
+  const v = $('chatInput').value.trim();
+  if (!v) return;
+  sendWs({ t:'chat_send', msg:v });
+  $('chatInput').value = '';
+}
+$('chatSendBtn').onclick = sendChat;
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+// ── Админ-панель модератора: сводка и список игроков (данные отдаёт сервер только модератору) ──
+let admData = null, admSortK = 'ls', admSortDir = -1;
+const fmtDur = s => { s = Math.floor(s); const h = Math.floor(s/3600), mi = Math.floor(s%3600/60); return h ? h+' ч '+mi+' м' : (s < 60 ? s+' с' : mi+' м'); };
+const fmtDate = ms => { if (!ms) return '—'; const d = new Date(ms), p2 = n => String(n).padStart(2,'0'); return p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+String(d.getFullYear()).slice(2)+' '+p2(d.getHours())+':'+p2(d.getMinutes()); };
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderAdm(){
+  if (!admData) return;
+  const d = admData;
+  $('admSum').innerHTML = [['Зарегистрировано', d.total], ['Онлайн сейчас', d.online], ['Новых за 24 ч', d.d1], ['Новых за 7 дней', d.d7], ['Всего времени в игре', fmtDur(d.ps)]]
+    .map(([k,v]) => '<div>'+k+'<b>'+v+'</b></div>').join('');
+  const q = $('admSearch').value.trim().toLowerCase();
+  const rows = d.list.filter(r => !q || r.n.toLowerCase().includes(q))
+    .sort((a,b) => (admSortK === 'n' ? a.n.localeCompare(b.n) : a[admSortK] - b[admSortK]) * admSortDir);
+  $('admBody').innerHTML = rows.map(r => '<tr'+(r.on?' class="on"':(r.h?' class="hid"':''))+'><td>'+(r.on?'● ':'')+escHtml(r.n)+'</td><td>'+r.lv+'</td><td>'+fmtDur(r.ps)+'</td><td>'+(r.on?'онлайн':fmtDate(r.ls))+'</td><td>'+fmtDate(r.cr)+'</td><td>'+r.mo+'</td><td>'+(r.on?'':'<span class="admHide" data-n="'+escHtml(r.n)+'" data-h="'+(r.h?0:1)+'">'+(r.h?'вернуть':'скрыть')+'</span>')+'</td></tr>').join('');
+  $('admShowTxt').textContent = 'Показывать скрытые (тестовые) аккаунты' + (d.nh ? ' — скрыто: ' + d.nh : '');
+}
+const admReq = () => sendWs({ t:'admin_stats', hidden: $('admShowHidden').checked ? 1 : 0 });
+function openAdm(){ $('admForm').hidden = false; admReq(); }
+$('admShowHidden').onchange = admReq;
+$('admBody').onclick = e => {
+  const b = e.target.closest('.admHide'); if (!b) return;
+  sendWs({ t:'admin_hide', nick:b.dataset.n, hide: b.dataset.h === '1' });
+};
+$('admClose').onclick = () => { $('admForm').hidden = true; };
+$('admSearch').oninput = renderAdm;
+document.querySelectorAll('#admTbl th').forEach(th => th.onclick = () => {
+  const k = th.dataset.k; if (admSortK === k) admSortDir = -admSortDir; else { admSortK = k; admSortDir = k === 'n' ? 1 : -1; }
+  renderAdm();
+});
+// ── Модерация (мут/бан) — доступна только тем, чей ник сервер пометил canMod в карточке игрока ──
+let modTargetNick = '';
+function openModForm(nick){
+  modTargetNick = nick; $('modErr').textContent = ''; $('modTarget').textContent = nick;
+  $('modMinutes').value = 10; ui.card = null; $('modForm').hidden = false;
+}
+$('modCancel').onclick = () => { $('modForm').hidden = true; };
+function modMinutesOrErr(){
+  const v = Math.round(Number($('modMinutes').value));
+  if (!Number.isFinite(v) || v < 0){ $('modErr').textContent = t('mod_bad_minutes'); return null; }
+  return v;
+}
+$('modMuteBtn').onclick = () => {
+  const v = modMinutesOrErr(); if (v === null) return;
+  if (v < 1){ $('modErr').textContent = t('mod_bad_minutes'); return; }
+  sendWs({ t:'mod_mute', nick:modTargetNick, minutes:v }); $('modForm').hidden = true;
+};
+$('modBanBtn').onclick = () => {
+  const v = modMinutesOrErr(); if (v === null) return;
+  sendWs({ t:'mod_ban', nick:modTargetNick, minutes:v }); $('modForm').hidden = true;
+};
+
+function drawClanPanel(){
+  if (!ui.clanPanel) return;
+  const w = 720, h = 480, x = (CW-w)/2, y = 84, c = clanState.clan, inv = clanState.invites;
+  ctx.fillStyle = 'rgba(8,8,16,0.96)'; rr(x, y, w, h, 14); ctx.fill();
+  ctx.strokeStyle = '#7dc8ff'; ctx.lineWidth = 2.5; rr(x, y, w, h, 14); ctx.stroke();
+  addHit(x, y, w, h, () => {});
+  txt(c ? '['+c.tag+'] '+c.name : '🛡 '+t('clan_title'), x+22, y+40, 26, '#7dc8ff', 'left', w-120);
+  txt('✕', x+w-26, y+38, 24, '#ff8a8a'); addHit(x+w-52, y+6, 46, 46, () => { ui.clanPanel = false; });
+  let cy = y + 58;
+
+  // приглашения (их может быть несколько, хранятся без срока)
+  if (inv.length){
+    txt(t('clan_invites', inv.length), x+22, cy+16, 16, '#ffd23f', 'left');
+    inv.slice(0, 3).forEach((iv, i) => {
+      const ry = cy + 26 + i*42;
+      ctx.fillStyle = 'rgba(60,90,140,0.35)'; rr(x+18, ry, w-36, 36, 8); ctx.fill();
+      txt('['+iv.tag+'] '+iv.name+(iv.from ? '  ·  '+iv.from : ''), x+30, ry+25, 16, '#fff', 'left', w-300);
+      ctx.fillStyle = '#2fae5c'; rr(x+w-238, ry+3, 130, 30, 8); ctx.fill(); txt('✔ '+t('accept'), x+w-173, ry+24, 15, '#fff');
+      addHit(x+w-238, ry+3, 130, 30, () => sendWs({ t:'clan_accept', id:iv.id }));
+      ctx.fillStyle = '#a33a3a'; rr(x+w-100, ry+3, 74, 30, 8); ctx.fill(); txt('✕', x+w-63, ry+25, 17, '#fff');
+      addHit(x+w-100, ry+3, 74, 30, () => sendWs({ t:'clan_decline', id:iv.id }));
+    });
+    cy += 26 + Math.min(3, inv.length)*42;
+    if (inv.length > 3){ txt(t('clan_more', inv.length-3), x+w/2, cy+10, 13, '#9fb0d8'); cy += 18; }
+    cy += 6;
+  }
+
+  if (!c){
+    txt(t('clan_none'), x+w/2, cy+60, 22, '#b8c8ee');
+    ctx.fillStyle = '#2f7fd0'; rr(x+w/2-140, cy+92, 280, 52, 12); ctx.fill();
+    txt(t('clan_create_btn'), x+w/2, cy+126, 20, '#fff');
+    addHit(x+w/2-140, cy+92, 280, 52, openClanForm);
+    return;
+  }
+  // участники
+  txt(t('clan_members', c.members.length), x+22, cy+20, 17, '#dfe6ff', 'left');
+  const listY = cy + 32, rowH = 34, listH = (y + h - 66) - listY, vis = Math.max(1, Math.floor(listH / rowH));
+  const maxScroll = Math.max(0, c.members.length - vis);
+  ui.clanScroll = Math.max(0, Math.min(maxScroll, ui.clanScroll || 0));
+  for (let i = 0; i < vis; i++){
+    const m = c.members[ui.clanScroll + i]; if (!m) break;
+    const ry = listY + i*rowH;
+    ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.07)'; rr(x+18, ry, w-76, rowH-4, 6); ctx.fill();
+    ctx.fillStyle = m.on ? '#4be06f' : '#5b6480'; ctx.beginPath(); ctx.arc(x+36, ry+15, 6, 0, Math.PI*2); ctx.fill();
+    txt((m.lead ? '👑 ' : '')+m.nick, x+52, ry+21, 16, m.lead ? '#ffd23f' : '#fff', 'left', 380);
+    txt(t('lvl_word', m.lvl), x+w-160, ry+21, 15, '#9fb0d8', 'right');
+    if (c.leader && !m.lead){
+      ctx.fillStyle = 'rgba(163,58,58,0.85)'; rr(x+w-140, ry+2, 48, 26, 6); ctx.fill(); txt('✕', x+w-116, ry+22, 15, '#fff');
+      addHit(x+w-140, ry+2, 48, 26, () => sendWs({ t:'clan_kick', acc:m.acc }));
+    }
+  }
+  if (maxScroll > 0){
+    ctx.fillStyle = 'rgba(80,110,170,0.8)';
+    rr(x+w-50, listY, 34, 34, 6); ctx.fill(); txt('▲', x+w-33, listY+24, 16, '#fff'); addHit(x+w-50, listY, 34, 34, () => { ui.clanScroll--; });
+    rr(x+w-50, listY+40, 34, 34, 6); ctx.fill(); txt('▼', x+w-33, listY+64, 16, '#fff'); addHit(x+w-50, listY+40, 34, 34, () => { ui.clanScroll++; });
+  }
+  if (c.leader){ ctx.font = '12px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#7f8db0'; ctx.fillText(t('clan_hint_invite'), x+22, y+h-28, w-260); }
+  ctx.fillStyle = 'rgba(120,40,40,0.85)'; rr(x+w-200, y+h-54, 180, 38, 10); ctx.fill();
+  txt(t('clan_leave_btn'), x+w-110, y+h-28, 15, '#fff', 'center', 170);
+  addHit(x+w-200, y+h-54, 180, 38, () => sendWs({ t:'clan_leave' }));
+}
+
+// ═══════════════ КЛУБ 21 (внутри) ═══════════════
+// Вход — на улице, в дальнем диком районе (дверь «CLUB 21»). Внутри — отдельная комната на весь экран:
+// драться нельзя, ботов нет, видны только те, кто тоже внутри. Обстановка и танцовщицы — просто картинка (декор).
+// Планировка и столкновения должны совпадать с CLUB на сервере (server/world.js).
+const clubPersp = y => 0.62 + 0.43 * (Math.max(0, Math.min(1, (y - 215) / (700 - 215))));
+const CLUB_DOOR_X = 6 * 1800 + 900;        // где на улице дверь клуба (центр 7-го района)
+let room = '';                             // '' — улица, 'club' — внутри клуба, 'garage' — внутри гаража
+
+// ═══════════════ ГАРАЖ (внутри) ═══════════════
+// Вход — на улице в районе «Гараж» (зона 2, центр). Внутри — фон-картинка (не тайлы/рисование, как
+// в клубе), поверх неё только настоящие игроки. Планировка/столкновения должны совпадать с GARAGE
+// на сервере (server/world.js).
+const GARAGE_DOOR_X = 2 * 1800 + 1500;   // ровно у тайла "открытый гараж со светящейся машиной" на фасаде (не просто центр района)
+const garagePersp = y => 0.72 + 0.28 * (Math.max(0, Math.min(1, (y - 380) / (700 - 380))));
+const GARAGE_X0 = 40, GARAGE_X1 = 1240, GARAGE_Y0 = 380, GARAGE_Y1 = 700;
+const GARAGE_DOOR = { x0:560, x1:760 };
+const GARAGE_BLOCKS = [ { x0:0, x1:660, y0:GARAGE_Y0, y1:410 }, { x0:930, x1:1280, y0:GARAGE_Y0, y1:415 } ];
+const GARAGE_LAMPS = [ [96,129], [358,191], [518,171], [935,197], [1131,175] ];
+const GARAGE_NEONS = [ [459,25], [276,122], [772,48], [993,106] ];
+const GARAGE_BG = new Image(); GARAGE_BG.src = 'sprites/room_bg/garage_bg2.png';
+function garageConstrainMe(){
+  me.x = Math.max(GARAGE_X0, Math.min(GARAGE_X1, me.x)); me.y = Math.max(GARAGE_Y0, Math.min(GARAGE_Y1, me.y));
+  for (const b of GARAGE_BLOCKS){
+    if (me.x > b.x0 && me.x < b.x1 && me.y > b.y0 && me.y < b.y1){
+      const dl=me.x-b.x0, dr=b.x1-me.x, dt=me.y-b.y0, db=b.y1-me.y, m=Math.min(dl,dr,dt,db);
+      if (m===dt) me.y=b.y0; else if (m===db) me.y=b.y1; else if (m===dl) me.x=b.x0; else me.x=b.x1;
+    }
+  }
+}
+function drawGarageLights(t){
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const flick = 0.85 + 0.15*Math.sin(t*0.02);
+  GARAGE_LAMPS.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.015 + i));
+    const g = ctx.createRadialGradient(x,y,2,x,y+70,190);
+    g.addColorStop(0, `rgba(255,210,130,${0.85*f})`); g.addColorStop(0.35, `rgba(255,160,70,${0.32*f})`); g.addColorStop(1,'rgba(255,160,70,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y+40,190,0,Math.PI*2); ctx.fill();
+  });
+  GARAGE_NEONS.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.02 + i*1.7));
+    const g = ctx.createRadialGradient(x,y,2,x,y,120);
+    g.addColorStop(0, `rgba(150,215,255,${0.8*f})`); g.addColorStop(0.4, `rgba(120,195,255,${0.25*f})`); g.addColorStop(1,'rgba(140,210,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,120,0,Math.PI*2); ctx.fill();
+  });
+  ctx.restore();
+}
+function garageExit(t){
+  ctx.save(); ctx.strokeStyle = '#3dff9a'; ctx.lineWidth = 3; ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 16;
+  ctx.globalAlpha = 0.8 + 0.2*Math.sin(t*0.006);
+  ctx.strokeRect(GARAGE_DOOR.x0, GARAGE_Y1-4, GARAGE_DOOR.x1-GARAGE_DOOR.x0, 6);
+  ctx.restore();
+  ctx.save(); ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 14;
+  txt('EXIT', (GARAGE_DOOR.x0+GARAGE_DOOR.x1)/2, GARAGE_Y1-34, 22, '#3dff9a');
+  ctx.restore();
+}
+function drawGarageScene(){
+  const tm = performance.now();
+  if (ready(GARAGE_BG)) ctx.drawImage(GARAGE_BG, 0, 0, CW, CH);
+  else { ctx.fillStyle = '#111'; ctx.fillRect(0,0,CW,CH); }
+  drawGarageLights(tm);
+  garageExit(tm);
+  for (const e of ents.values()) drawActor(e);   // единственные "жители" гаража — настоящие игроки, порядок по глубине не критичен (нет мебели-игроков рядом)
+  const vg = ctx.createRadialGradient(CW/2, CH/2, 260, CW/2, CH/2, 780); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, CW, CH);
+}
+
+// ═══════════════ ПИЦЦЕРИЯ (внутри) ═══════════════
+// Вход — на улице в районе «Пиццерия» (зона 4). Внутри — фон-картинка, как в гараже, поверх только
+// настоящие игроки. Планировка/столкновения должны совпадать с PIZZERIA на сервере (server/world.js).
+const PIZZERIA_DOOR_X = 4 * 1800 + 1120 + 145;   // ВТОРОЙ тайл "pizza" (дальше от площади), точно на нарисованной двери слева от вывески
+const pizzeriaPersp = y => 0.72 + 0.28 * (Math.max(0, Math.min(1, (y - 371) / (700 - 371))));
+const PIZZERIA_X0 = 40, PIZZERIA_X1 = 1240, PIZZERIA_Y0 = 371, PIZZERIA_Y1 = 700;
+const PIZZERIA_DOOR = { x0:560, x1:760 };
+// Границы пола — по красной линии, которую нарисовал пользователь поверх референса (найдены
+// анализом пикселей его разметки): плавный откос у левой кабинки, ровная середина у барной
+// стойки, откос и глубокая "мёртвая зона" у столиков/холодильника справа.
+const PIZZERIA_BLOCKS = [
+  { x0:0, x1:60, y0:PIZZERIA_Y0, y1:429 }, { x0:60, x1:120, y0:PIZZERIA_Y0, y1:417 },
+  { x0:120, x1:180, y0:PIZZERIA_Y0, y1:403 }, { x0:180, x1:240, y0:PIZZERIA_Y0, y1:388 },
+  { x0:240, x1:300, y0:PIZZERIA_Y0, y1:379 },
+  { x0:840, x1:900, y0:PIZZERIA_Y0, y1:377 }, { x0:900, x1:960, y0:PIZZERIA_Y0, y1:385 },
+  { x0:960, x1:1020, y0:PIZZERIA_Y0, y1:399 }, { x0:1020, x1:1080, y0:PIZZERIA_Y0, y1:414 },
+  { x0:1080, x1:1140, y0:PIZZERIA_Y0, y1:426 }, { x0:1140, x1:1200, y0:PIZZERIA_Y0, y1:432 },
+  { x0:1200, x1:1240, y0:PIZZERIA_Y0, y1:615 },
+];
+const PIZZERIA_LAMPS = [ [190,88],[286,142],[321,173],[364,180],[489,149],[574,233],[766,155],[819,227],[947,172],[995,142],[1046,180],[1087,90],[1129,157] ];
+const PIZZERIA_NEONS_RED = [ [624,188],[344,226],[1110,216] ];   // главная вывеска PIZZA, левая настенная с долькой, правый постер
+const PIZZERIA_NEONS_BLUE = [ [153,213],[1191,188] ];             // OPEN на окне, "PIZZA LIFE" справа
+const PIZZERIA_BG = new Image(); PIZZERIA_BG.src = 'sprites/room_bg/pizzeria_bg.png';
+function pizzeriaConstrainMe(){
+  // блоки — локальное поднятие границы пола в колонке x (лестница по линии пользователя),
+  // не отдельные препятствия, поэтому просто не пускаем выше b.y1 в этом x-диапазоне.
+  me.x = Math.max(PIZZERIA_X0, Math.min(PIZZERIA_X1, me.x)); me.y = Math.max(PIZZERIA_Y0, Math.min(PIZZERIA_Y1, me.y));
+  for (const b of PIZZERIA_BLOCKS){
+    if (me.x > b.x0 && me.x < b.x1 && me.y < b.y1) me.y = b.y1;
+  }
+}
+function drawPizzeriaLights(t){
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const flick = 0.85 + 0.15*Math.sin(t*0.02);
+  PIZZERIA_LAMPS.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.015 + i));
+    const g = ctx.createRadialGradient(x,y,2,x,y+55,150);
+    g.addColorStop(0, `rgba(255,220,150,${0.8*f})`); g.addColorStop(0.35, `rgba(255,175,90,${0.3*f})`); g.addColorStop(1,'rgba(255,175,90,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y+30,150,0,Math.PI*2); ctx.fill();
+  });
+  PIZZERIA_NEONS_RED.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.02 + i*1.7));
+    const g = ctx.createRadialGradient(x,y,2,x,y,130);
+    g.addColorStop(0, `rgba(255,80,80,${0.85*f})`); g.addColorStop(0.4, `rgba(255,50,60,${0.3*f})`); g.addColorStop(1,'rgba(255,50,60,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,130,0,Math.PI*2); ctx.fill();
+  });
+  PIZZERIA_NEONS_BLUE.forEach(([x,y], i) => {
+    const f = flick * (0.9 + 0.1*Math.sin(t*0.025 + i*2.1));
+    const g = ctx.createRadialGradient(x,y,2,x,y,120);
+    g.addColorStop(0, `rgba(120,190,255,${0.8*f})`); g.addColorStop(0.4, `rgba(100,170,255,${0.28*f})`); g.addColorStop(1,'rgba(100,170,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x,y,120,0,Math.PI*2); ctx.fill();
+  });
+  ctx.restore();
+}
+function pizzeriaExit(t){
+  ctx.save(); ctx.strokeStyle = '#3dff9a'; ctx.lineWidth = 3; ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 16;
+  ctx.globalAlpha = 0.8 + 0.2*Math.sin(t*0.006);
+  ctx.strokeRect(PIZZERIA_DOOR.x0, PIZZERIA_Y1-4, PIZZERIA_DOOR.x1-PIZZERIA_DOOR.x0, 6);
+  ctx.restore();
+  ctx.save(); ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 14;
+  txt('EXIT', (PIZZERIA_DOOR.x0+PIZZERIA_DOOR.x1)/2, PIZZERIA_Y1-34, 22, '#3dff9a');
+  ctx.restore();
+}
+function drawPizzeriaScene(){
+  const tm = performance.now();
+  if (ready(PIZZERIA_BG)) ctx.drawImage(PIZZERIA_BG, 0, 0, CW, CH);
+  else { ctx.fillStyle = '#111'; ctx.fillRect(0,0,CW,CH); }
+  drawPizzeriaLights(tm);
+  pizzeriaExit(tm);
+  for (const e of ents.values()) drawActor(e);
+  const vg2 = ctx.createRadialGradient(CW/2, CH/2, 260, CW/2, CH/2, 780); vg2.addColorStop(0, 'rgba(0,0,0,0)'); vg2.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg2; ctx.fillRect(0, 0, CW, CH);
+}
+const CLUB_STOOL_X = [126, 284, 482, 632, 814, 995];          // барные стулья (по рисунку — 6 штук)
+const CLUB_STOOL_Y = 262;                                     // стулья стоят перед стойкой
+const CLUB_BAR_BASE = 236;                                    // где стойка стоит на полу
+const CLUB_TABLES = [ { x:1098, y:330 }, { x:908, y:431 }, { x:1122, y:494 }, { x:1019, y:616 } ];
+const CLUB_DANCE = { x0:56, y0:300, x1:520, y1:690 };
+const CLUB_DJ = { x:96, y:452 };
+const CLUB_DOOR = { x0:590, x1:772 };                          // вход/выход снизу
+
+const CLUB_NPCS = [];
+// ── ТАНЦОРЫ: готовые CC0-спрайты «Dancing Girl» (Luis Zuno / Ansimuz, opengameart.org/content/dancing-girl-sprites),
+// 5 танцев по 8 кадров, лежат в sprites/club_npc/dancing_girl/. Всего ТРИ девушки — в разных частях танцпола,
+// у каждой свои цвета волос и платья: перекрашиваем ТОЧНО по палитре спрайта (кожа не трогается).
+const CLUB_DANCES = [['Balancing','balancing'], ['hips','hips'], ['Skip','skip'], ['slide','slide'], ['snap','snap']];
+// исходные цвета спрайта: волосы 206,32,56 / 138,11,65 (тень); платье 192,177,10 / 91,103,49 (тень); юбка/отделка 136,140,120 / 88,86,81
+const CLUB_PALETTES = [
+  { name:'красные волосы, синее платье', map:{ '192,177,10':[52,120,235], '91,103,49':[24,60,150], '136,140,120':[150,168,210], '88,86,81':[64,76,112] } },
+  { name:'чёрные волосы, розовое платье', map:{ '206,32,56':[46,36,58], '138,11,65':[24,18,32], '192,177,10':[240,72,160], '91,103,49':[150,26,92], '136,140,120':[232,176,208], '88,86,81':[122,62,92] } },
+  { name:'светлые волосы, изумрудное платье', map:{ '206,32,56':[246,206,92], '138,11,65':[192,142,46], '192,177,10':[30,190,120], '91,103,49':[14,108,70], '136,140,120':[168,224,198], '88,86,81':[58,108,88] } },
+];
+const _cdfr = {}, _crc = {};
+function clubDanceFrames(di){
+  if (_cdfr[di]) return _cdfr[di];
+  const [dir, pre] = CLUB_DANCES[di], out = [];
+  for (let i = 1; i <= 8; i++){ const im = new Image(); im.src = 'sprites/club_npc/dancing_girl/' + dir + '/' + pre + i + '.png'; out.push(im); }
+  return _cdfr[di] = out;
+}
+// перекрашенный кадр (кэш): заменяем только цвета волос/платья по таблице палитры
+function clubRecolored(pi, di, fi){
+  const key = pi + '|' + di + '|' + fi; if (_crc[key]) return _crc[key];
+  const im = clubDanceFrames(di)[fi]; if (!ready(im)) return null;
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  const id = g.getImageData(0, 0, c.width, c.height), d = id.data, map = CLUB_PALETTES[pi].map;
+  for (let o = 0; o < d.length; o += 4){ if (d[o+3] < 40) continue; const m = map[d[o] + ',' + d[o+1] + ',' + d[o+2]]; if (m){ d[o] = m[0]; d[o+1] = m[1]; d[o+2] = m[2]; } }
+  g.putImageData(id, 0, 0);
+  return _crc[key] = c;
+}
+// три девушки: разные части танцпола, разные танцы, разные палитры
+const CLUB_DANCERS = [ { x:190, y:400, di:1, pi:0, flip:false, ph:0.0 }, { x:415, y:490, di:4, pi:1, flip:true, ph:2.5 }, { x:250, y:625, di:0, pi:2, flip:false, ph:5.0 } ];
+CLUB_DANCERS.forEach(dn => {
+  CLUB_NPCS.push({ y: dn.y, draw(c, t){
+    const fi = Math.floor(t/1000*9 + dn.ph) % 8, img = clubRecolored(dn.pi, dn.di, fi);
+    if (!img) return;
+    const k = clubPersp(dn.y), h = 122 * k, sc = h / img.height, dw = img.width * sc;
+    c.save(); c.globalAlpha = 0.3; c.fillStyle = '#000'; c.beginPath(); c.ellipse(dn.x, dn.y, 26*k, 6*k, 0, 0, Math.PI*2); c.fill(); c.restore();
+    c.save(); c.imageSmoothingEnabled = false; c.translate(dn.x, dn.y); if (dn.flip) c.scale(-1, 1); c.drawImage(img, -dw/2, -h + 4, dw, h); c.restore();
+  }});
+});
+
+// ── пол, танцпол ──
+function clubFloor(t){
+  const g = ctx.createLinearGradient(0, 200, 0, CH); g.addColorStop(0, '#231524'); g.addColorStop(1, '#14101c');
+  ctx.fillStyle = g; ctx.fillRect(0, 200, CW, CH-200);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 200, CW, CH-200); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 2;
+  for (let y = 214; y < CH; y += 46){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke(); }
+  for (let row = 0, y = 214; y < CH; y += 46, row++) for (let x = (row%2)*60; x < CW; x += 120){ ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y+46); ctx.stroke(); }
+  ctx.restore();
+  // ковровая дорожка от входа
+  ctx.fillStyle = 'rgba(150,20,50,0.55)'; ctx.fillRect(CLUB_DOOR.x0+22, 560, CLUB_DOOR.x1-CLUB_DOOR.x0-44, CH-560);
+  ctx.strokeStyle = 'rgba(255,200,90,0.55)'; ctx.lineWidth = 3; ctx.strokeRect(CLUB_DOOR.x0+22, 560, CLUB_DOOR.x1-CLUB_DOOR.x0-44, CH-560);
+  // ТАНЦПОЛ: светящиеся плитки в ритме
+  const cols = 8, rows = 6, cw = (CLUB_DANCE.x1-CLUB_DANCE.x0)/cols, ch = (CLUB_DANCE.y1-CLUB_DANCE.y0)/rows;
+  ctx.save(); rr(CLUB_DANCE.x0-8, CLUB_DANCE.y0-8, CLUB_DANCE.x1-CLUB_DANCE.x0+16, CLUB_DANCE.y1-CLUB_DANCE.y0+16, 26); ctx.fillStyle = '#0a0612'; ctx.fill(); ctx.clip();
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++){
+    const hue = (c*38 + r*52 + t*0.09) % 360, pulse = 0.35 + 0.35*Math.sin(t*0.006 + c*0.9 + r*1.3);
+    ctx.fillStyle = `hsla(${hue},90%,55%,${0.25 + pulse*0.5})`;
+    ctx.fillRect(CLUB_DANCE.x0 + c*cw + 2, CLUB_DANCE.y0 + r*ch + 2, cw-4, ch-4);
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,120,220,0.9)'; ctx.lineWidth = 3; ctx.shadowColor = '#ff3cdc'; ctx.shadowBlur = 16;
+  rr(CLUB_DANCE.x0-8, CLUB_DANCE.y0-8, CLUB_DANCE.x1-CLUB_DANCE.x0+16, CLUB_DANCE.y1-CLUB_DANCE.y0+16, 26); ctx.stroke(); ctx.shadowBlur = 0;
+}
+
+// ── задняя стена и полки ──
+function clubWall(t){
+  const wg = ctx.createLinearGradient(0, 0, 0, 205); wg.addColorStop(0, '#0c0416'); wg.addColorStop(1, '#2a0d36');
+  ctx.fillStyle = wg; ctx.fillRect(0, 0, CW, 205);
+  ctx.save(); ctx.lineWidth = 4;
+  [['#ff2fb0', 24], ['#2fe0ff', 34]].forEach(([c, y], i) => { ctx.strokeStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 14; ctx.globalAlpha = 0.7 + 0.3*Math.sin(t*0.004 + i); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CW, y); ctx.stroke(); });
+  ctx.restore();
+  for (let s = 0; s < 2; s++){
+    const sy = 102 + s*40;
+    ctx.fillStyle = '#3a2418'; ctx.fillRect(150, sy+22, 1010, 5);
+    for (let x = 160; x < 1150; x += 22){
+      const hue = (x*7 + s*90) % 360, h = 18 + ((x*13)%14);
+      ctx.fillStyle = `hsl(${hue},70%,50%)`; ctx.fillRect(x, sy+22-h, 9, h);
+      ctx.fillStyle = `hsl(${hue},70%,70%)`; ctx.fillRect(x+3, sy+22-h-6, 3, 6);
+    }
+  }
+  txt('BAR', 640, 44, 34, '#ffe789', 'center');
+  ctx.save(); ctx.shadowColor = '#ff2fb0'; ctx.shadowBlur = 18; txt('CLUB 21', 1090, 34, 22, '#ff8fe0'); ctx.restore();
+}
+// барная стойка: столешница + лицевая панель (рисуется один раз, ДО всех, кто стоит перед ней)
+function clubBar(){
+  // Высота от низа столешницы до неоновой линии у пола была 44px — теперь ровно вдвое меньше: 22px. Основание на CLUB_BAR_BASE не менялось.
+  const front = 22, lineY = CLUB_BAR_BASE - 4, topBottom = lineY - front, top = topBottom - 20;   // столешница толщиной 22 (top-2 .. top+20)
+  ctx.fillStyle = '#7a4a2a'; rr(40, top - 2, 1140, 22, 10); ctx.fill();                       // столешница
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(56, top + 1, 1108, 3);
+  const fg = ctx.createLinearGradient(0, topBottom - 4, 0, CLUB_BAR_BASE); fg.addColorStop(0, '#2b1a12'); fg.addColorStop(1, '#170d09');
+  ctx.fillStyle = fg; rr(40, topBottom - 4, 1140, CLUB_BAR_BASE - topBottom + 4, 8); ctx.fill();   // передняя панель
+  ctx.strokeStyle = '#ff2fb0'; ctx.lineWidth = 3; ctx.shadowColor = '#ff2fb0'; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.moveTo(52, lineY); ctx.lineTo(1168, lineY); ctx.stroke(); ctx.shadowBlur = 0;
+}
+// барный стул (пока пустой)
+function clubStool(x, y){
+  const k = clubPersp(y), sy = y - 42*k;
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x, y+2, 26*k, 7*k, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#9aa0b8'; ctx.lineWidth = 2.2*k;
+  for (const ox of [-15, 15]){ ctx.beginPath(); ctx.moveTo(x + ox*0.7*k, sy + 5*k); ctx.lineTo(x + ox*1.4*k, y); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(x - 20*k, y - 14*k); ctx.lineTo(x + 20*k, y - 14*k); ctx.stroke();
+  ctx.fillStyle = '#a01830'; ctx.beginPath(); ctx.ellipse(x, sy, 26*k, 9*k, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+// ── столики с выпивкой (свечей нет; у каждого стола свой набор) ──
+const CLUB_DRINKS = [ ['beer','cocktail','shots'], ['wine','bottle','tall'], ['tall','beer','beer'], ['cocktail','wine','shots'] ];
+function clubDrink(kind, x, y, k){
+  const u = k * 1.25; ctx.save(); ctx.translate(x, y); ctx.lineJoin = 'round';
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(0, 1*u, 8*u, 3*u, 0, 0, Math.PI*2); ctx.fill();
+  if (kind === 'beer'){        // кружка пива с пеной и ручкой
+    ctx.fillStyle = '#e8a020'; ctx.fillRect(-6*u, -15*u, 12*u, 15*u); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-4.5*u, -14*u, 2*u, 12*u);
+    ctx.fillStyle = '#fff8e0'; ctx.beginPath(); ctx.ellipse(0, -15.5*u, 7*u, 3*u, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#cfd6dc'; ctx.lineWidth = 2*u; ctx.beginPath(); ctx.arc(8*u, -8*u, 4*u, -1.3, 1.3); ctx.stroke();
+  } else if (kind === 'cocktail'){   // мартини-бокал с соломинкой и долькой лайма
+    ctx.fillStyle = '#ff4fa3'; ctx.beginPath(); ctx.moveTo(-9*u, -20*u); ctx.lineTo(9*u, -20*u); ctx.lineTo(0, -10*u); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#dfe8f0'; ctx.lineWidth = 1.5*u; ctx.beginPath(); ctx.moveTo(-9*u, -20*u); ctx.lineTo(0, -10*u); ctx.lineTo(9*u, -20*u); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -10*u); ctx.lineTo(0, -1*u); ctx.moveTo(-5*u, -1*u); ctx.lineTo(5*u, -1*u); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6*u; ctx.beginPath(); ctx.moveTo(3*u, -19*u); ctx.lineTo(7*u, -28*u); ctx.stroke();
+    ctx.fillStyle = '#7bd94a'; ctx.beginPath(); ctx.arc(-8*u, -20*u, 3.2*u, 0, Math.PI*2); ctx.fill();
+  } else if (kind === 'wine'){       // бокал вина
+    ctx.fillStyle = '#a01838'; ctx.beginPath(); ctx.moveTo(-6*u, -22*u); ctx.quadraticCurveTo(-7*u, -12*u, 0, -11*u); ctx.quadraticCurveTo(7*u, -12*u, 6*u, -22*u); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#dfe8f0'; ctx.lineWidth = 1.5*u; ctx.beginPath(); ctx.moveTo(-6*u, -22*u); ctx.quadraticCurveTo(-7*u, -12*u, 0, -11*u); ctx.quadraticCurveTo(7*u, -12*u, 6*u, -22*u); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -11*u); ctx.lineTo(0, -1*u); ctx.moveTo(-5*u, -1*u); ctx.lineTo(5*u, -1*u); ctx.stroke();
+  } else if (kind === 'bottle'){     // бутылка
+    ctx.fillStyle = '#1f6b3a'; ctx.fillRect(-4*u, -18*u, 8*u, 18*u); ctx.fillRect(-2*u, -28*u, 4*u, 10*u);
+    ctx.fillStyle = '#e8e0c0'; ctx.fillRect(-4*u, -12*u, 8*u, 6*u); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(-3*u, -17*u, 1.5*u, 15*u);
+  } else if (kind === 'tall'){       // высокий стакан (мохито): лайм, соломинка
+    ctx.fillStyle = 'rgba(160,240,190,0.85)'; ctx.fillRect(-5*u, -22*u, 10*u, 22*u); ctx.strokeStyle = '#dfe8f0'; ctx.lineWidth = 1.5*u; ctx.strokeRect(-5*u, -22*u, 10*u, 22*u);
+    ctx.fillStyle = '#7bd94a'; ctx.beginPath(); ctx.arc(-4*u, -22*u, 3.4*u, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ff5a7a'; ctx.lineWidth = 1.8*u; ctx.beginPath(); ctx.moveTo(2*u, -20*u); ctx.lineTo(6*u, -31*u); ctx.stroke();
+  } else if (kind === 'shots'){      // три рюмки
+    [-9, 0, 9].forEach((ox, i) => { ctx.fillStyle = ['#ffd23f','#7fe3ff','#ff8a4a'][i]; ctx.fillRect(ox*u - 3*u, -9*u, 6*u, 9*u);
+      ctx.strokeStyle = '#dfe8f0'; ctx.lineWidth = 1.2*u; ctx.strokeRect(ox*u - 3*u, -9*u, 6*u, 9*u); });
+  }
+  ctx.restore();
+}
+function clubTable(tb){
+  const k = clubPersp(tb.y), r = 52*k, ti = CLUB_TABLES.indexOf(tb), ty = tb.y - 44*k;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(tb.x, tb.y+4, r*1.05, r*0.36, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2a2a34'; ctx.fillRect(tb.x - 5*k, ty, 10*k, 44*k);
+  ctx.fillStyle = '#3d2618'; ctx.beginPath(); ctx.ellipse(tb.x, ty, r, r*0.36, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#ff9d2e'; ctx.lineWidth = 2; ctx.stroke();
+  const set = CLUB_DRINKS[ti % CLUB_DRINKS.length], offs = [[-24, 3], [4, 8], [26, 1]];
+  set.forEach((kind, i) => clubDrink(kind, tb.x + offs[i][0]*k, ty + offs[i][1]*k, k));
+}
+
+// ── колонки по краям танцпола (пульт диджея убран) ──
+function clubSpeakers(t){
+  for (const sy of [CLUB_DJ.y - 110, CLUB_DJ.y + 70]){
+    ctx.fillStyle = '#15151c'; rr(14, sy, 54, 92, 6); ctx.fill(); ctx.strokeStyle = '#3a3a46'; ctx.lineWidth = 2; ctx.stroke();
+    for (const [cy, r] of [[sy+26, 15], [sy+64, 19]]){
+      const beat = 1 + 0.08*Math.sin(t*0.02);
+      ctx.fillStyle = '#0a0a0e'; ctx.beginPath(); ctx.arc(41, cy, r*beat, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#ff2fb0'; ctx.stroke();
+    }
+  }
+}
+
+// ── свет: диско-шар, лучи, блики ──
+function clubLights(t){
+  const bx = (CLUB_DANCE.x0 + CLUB_DANCE.x1)/2;
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, 60); ctx.stroke();
+  const gr = ctx.createRadialGradient(bx-8, 58, 3, bx, 68, 24); gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#8a8aa0');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bx, 70, 22, 0, Math.PI*2); ctx.fill();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 3; i++){
+    const a = t*0.0011 + i*2.1, tx = bx + Math.sin(a)*190, ty = 470 + Math.cos(a*1.3)*110, hue = (i*120 + t*0.05) % 360;
+    const g = ctx.createRadialGradient(tx, ty, 0, tx, ty, 130); g.addColorStop(0, `hsla(${hue},100%,60%,0.35)`); g.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tx, ty, 130, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = `hsla(${hue},100%,70%,0.16)`; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(bx, 78); ctx.lineTo(tx, ty); ctx.stroke();
+  }
+  ctx.restore();
+  for (let i = 0; i < 26; i++){ const a = i*2.4 + t*0.0004*(1+(i%3)), x = bx + Math.cos(a)*(90 + (i*37)%200), y = 330 + Math.sin(a*1.7)*(100 + (i*23)%140);
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + 0.3*Math.abs(Math.sin(t*0.003 + i))})`; ctx.fillRect(x, y, 3, 3); }
+}
+function clubExit(t){
+  ctx.fillStyle = '#05030a'; ctx.fillRect(CLUB_DOOR.x0, CH-30, CLUB_DOOR.x1-CLUB_DOOR.x0, 30);
+  ctx.save(); ctx.strokeStyle = '#3dff9a'; ctx.lineWidth = 4; ctx.shadowColor = '#3dff9a'; ctx.shadowBlur = 16; ctx.globalAlpha = 0.75 + 0.25*Math.sin(t*0.006);
+  ctx.strokeRect(CLUB_DOOR.x0, CH-30, CLUB_DOOR.x1-CLUB_DOOR.x0, 34); ctx.restore();
+  txt('EXIT', (CLUB_DOOR.x0+CLUB_DOOR.x1)/2, CH-8, 16, '#3dff9a');
+}
+
+
+function clubConstrainMe(){
+  me.x = Math.max(34, Math.min(1246, me.x)); me.y = Math.max(246, Math.min(705, me.y));
+  for (const tb of CLUB_TABLES){ const dx = me.x - tb.x, dy = (me.y - tb.y) * 1.6, d = Math.hypot(dx, dy); if (d < 70){ me.x = tb.x + dx/(d||1)*70; me.y = tb.y + dy/(d||1)*70/1.6; } }
+  for (const sx of CLUB_STOOL_X){ const dx = me.x - sx, dy = (me.y - CLUB_STOOL_Y) * 2.2, d = Math.hypot(dx, dy); if (d < 34){ me.x = sx + dx/(d||1)*34; me.y = CLUB_STOOL_Y + dy/(d||1)*34/2.2; } }
+}
+function drawClubScene(){
+  const tm = performance.now();
+  clubFloor(tm); clubWall(tm); clubBar(); clubSpeakers(tm);
+  // всё на полу — по глубине: стулья, столики, танцовщицы (декор) и настоящие игроки внутри
+  const items = [];
+  CLUB_STOOL_X.forEach(x => items.push({ y: CLUB_STOOL_Y, fn: () => clubStool(x, CLUB_STOOL_Y) }));
+  CLUB_TABLES.forEach(tb => items.push({ y: tb.y, fn: () => clubTable(tb) }));
+  CLUB_NPCS.forEach(n => items.push({ y: n.y, fn: () => n.draw(ctx, tm) }));
+  for (const e of ents.values()) items.push({ y: e.ry, fn: () => drawActor(e) });
+  items.sort((a, b) => a.y - b.y).forEach(it => it.fn());
+  clubExit(tm); clubLights(tm);
+  const vg = ctx.createRadialGradient(CW/2, CH/2, 250, CW/2, CH/2, 760); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, CW, CH);
+}
+function changeRoom(r){
+  room = r; ui.fade = 0.6; ui.card = null;
+  // при входе в комнату камера всегда 0 (там свои локальные координаты). При ВЫХОДЕ раньше camX
+  // просто оставался как есть (0, с прошлого раза внутри комнаты) и потом несколько кадров плавно
+  // "доезжал" до настоящего места через update() — а пока не доехал, drawWalls/drawZoneDecor (после
+  // перехода мира на кольцо) считают район по НЕВЕРНОМУ camX и не находят его на экране, район не
+  // рисуется — короткая вспышка черноты/рваного кадра при выходе из клуба/гаража/пиццерии.
+  // Теперь при выходе сразу ставим камеру на настоящее место, без "доездов".
+  if (r === 'club' || r === 'garage' || r === 'pizzeria') camX = 0; else camX = me.x - CW/2;
+}
+
+// дверь: на улице у клуба/гаража/пиццерии — «Войти», внутри у нижнего выхода — «Выйти» (E или кнопка на телефоне)
+function doorState(){
+  if (room === 'club') return (me.y >= 672 && me.x > 590 && me.x < 772) ? 'leave' : null;
+  if (room === 'garage') return (me.y >= GARAGE_Y1 - 20 && me.x > GARAGE_DOOR.x0 && me.x < GARAGE_DOOR.x1) ? 'leave' : null;
+  if (room === 'pizzeria') return (me.y >= PIZZERIA_Y1 - 20 && me.x > PIZZERIA_DOOR.x0 && me.x < PIZZERIA_DOOR.x1) ? 'leave' : null;
+  if (Math.abs(wrapDelta(me.x, CLUB_DOOR_X)) < 90 && me.y < GROUND_MIN + 30) return 'enter_club';
+  if (Math.abs(wrapDelta(me.x, GARAGE_DOOR_X)) < 90 && me.y < GROUND_MIN + 30) return 'enter_garage';
+  if (Math.abs(wrapDelta(me.x, PIZZERIA_DOOR_X)) < 90 && me.y < GROUND_MIN + 30) return 'enter_pizzeria';
+  return null;
+}
+function doorGo(ds){
+  if (ds === 'leave') sendWs({ t:'leave', b: room });
+  else sendWs({ t:'enter', b: ds === 'enter_club' ? 'club' : ds === 'enter_garage' ? 'garage' : 'pizzeria' });
+}
+function drawDoorPrompt(){
+  const ds = doorState(); if (!ds) return;
+  const label = t(ds === 'leave' ? 'door_exit' : 'door_enter');
+  if (ui.touch){                                                                    // телефон: круглая кнопка над «Блоком»
+    const bx = 1180, by = 318, br = 46;
+    ctx.fillStyle = '#2fae5c'; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    txt('🚪', bx, by - 2, 26, '#fff'); txt(label, bx, by + 24, 13, '#fff', 'center', 80);
+    addHit(bx - br, by - br, br*2, br*2, () => doorGo(ds));
+  } else {                                                                          // компьютер: подсказка над дверью / у выхода
+    const doorX = ds === 'enter_garage' ? GARAGE_DOOR_X : ds === 'enter_pizzeria' ? PIZZERIA_DOOR_X : CLUB_DOOR_X;
+    const px = (room === 'club' || room === 'garage' || room === 'pizzeria') ? CW/2 : nearestWrap(doorX, camX) - camX, py = (room === 'club' || room === 'garage' || room === 'pizzeria') ? CH - 74 : 236;
+    const w = 250, h = 44;
+    ctx.fillStyle = 'rgba(8,8,16,0.88)'; rr(px - w/2, py - h/2, w, h, 12); ctx.fill();
+    ctx.strokeStyle = '#3dff9a'; ctx.lineWidth = 2.5; rr(px - w/2, py - h/2, w, h, 12); ctx.stroke();
+    txt('🚪 ' + label + '  [E]', px, py + 7, 19, '#3dff9a');
+    addHit(px - w/2, py - h/2, w, h, () => doorGo(ds));
+  }
+}
+
+// ═══════════════ ЛОГИКА КАДРА ═══════════════
+let camX = 0, stepTimer = 0;
+function toast(text, color){ ui.toasts.push({ text, color: color||'#fff', t:2.6 }); if (ui.toasts.length > 3) ui.toasts.shift(); }
+function floater(e, text, color){ ui.floaters.push({ e, text, color, t:0 }); }
+
+// ═══════════════ ЗВУКИ ═══════════════
+// Синтезируются на лету через Web Audio (тот же приём, что уже в streetfighter_arena.html) —
+// без файлов, без лицензий. Мир открытый, боёв может быть много одновременно — звук удара/нокаута
+// слышен и от ЧУЖИХ драк поблизости (не только своей), громкость падает с расстоянием и обнуляется
+// за HEARING_RANGE пикселей, чтобы драка на другом конце карты не была слышна.
+let soundOn = true;
+try { soundOn = localStorage.getItem('world_sound') !== '0'; } catch(_){}
+let audioCtx = null;
+function getAudioCtx(){ if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+document.addEventListener('pointerdown', function unlockAudioOnce(){ try{ getAudioCtx().resume(); }catch(_){} }, { once:true });
+
+const HEARING_RANGE = 900;
+function hearVol(x, y){ return Math.pow(Math.max(0, 1 - Math.hypot(wrapDelta(me.x,x), y-me.y)/HEARING_RANGE), 1.5); }
+
+function playHit(vol, blocked){
+  if (!soundOn || vol <= 0.02) return;
+  const ac = getAudioCtx(), now = ac.currentTime;
+  const osc = ac.createOscillator(), gain = ac.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(blocked ? 340 : 150, now);
+  osc.frequency.exponentialRampToValueAtTime(blocked ? 220 : 55, now + (blocked ? 0.06 : 0.09));
+  gain.gain.setValueAtTime(0.4*vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + (blocked ? 0.09 : 0.13));
+  osc.connect(gain); gain.connect(ac.destination);
+  osc.start(now); osc.stop(now + 0.14);
+  if (!blocked){
+    const bufSize = Math.floor(ac.sampleRate*0.06);
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate), data = buf.getChannelData(0);
+    for (let i=0;i<bufSize;i++) data[i] = (Math.random()*2-1)*(1-i/bufSize);
+    const noise = ac.createBufferSource(); noise.buffer = buf;
+    const noiseGain = ac.createGain();
+    noiseGain.gain.setValueAtTime(0.3*vol, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now+0.06);
+    noise.connect(noiseGain); noiseGain.connect(ac.destination);
+    noise.start(now);
+  }
+}
+function playKo(vol){
+  if (!soundOn || vol <= 0.02) return;
+  const ac = getAudioCtx(), now = ac.currentTime;
+  const osc = ac.createOscillator(), gain = ac.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, now);
+  osc.frequency.exponentialRampToValueAtTime(38, now+0.5);
+  gain.gain.setValueAtTime(0.32*vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now+0.55);
+  osc.connect(gain); gain.connect(ac.destination);
+  osc.start(now); osc.stop(now+0.6);
+}
+function playStep(){
+  if (!soundOn) return;
+  const ac = getAudioCtx(), now = ac.currentTime;
+  const bufSize = Math.floor(ac.sampleRate*0.03);
+  const buf = ac.createBuffer(1, bufSize, ac.sampleRate), data = buf.getChannelData(0);
+  for (let i=0;i<bufSize;i++) data[i] = (Math.random()*2-1)*(1-i/bufSize)*0.5;
+  const noise = ac.createBufferSource(); noise.buffer = buf;
+  const filt = ac.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 700;
+  const gain = ac.createGain(); gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now+0.03);
+  noise.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+  noise.start(now);
+}
+function playChatDing(){
+  if (!soundOn) return;
+  const ac = getAudioCtx(), now = ac.currentTime;
+  [880, 1320].forEach((f, i) => {
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(f, now + i*0.07);
+    gain.gain.setValueAtTime(0, now + i*0.07);
+    gain.gain.linearRampToValueAtTime(0.12, now + i*0.07 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + i*0.07 + 0.25);
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.start(now + i*0.07); osc.stop(now + i*0.07 + 0.26);
+  });
+}
+function applySndBtn(){ $('snd').textContent = soundOn ? '🔊' : '🔇'; }
+applySndBtn();
+$('snd').addEventListener('click', () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem('world_sound', soundOn ? '1' : '0'); } catch(_){}
+  applySndBtn();
+  if (soundOn) { try { getAudioCtx().resume(); } catch(_){} }
+});
+
+// ── Фоновая музыка (Final Punch, maxstack, CC BY-SA — тот же трек и лицензия, что в Street
+// Fighter, см. audio/LICENSE_streetfighter_theme.txt) — отдельный тумблер от звуков игры,
+// чтобы можно было выключить что-то одно ──
+const BG_MUSIC_VOLUME = 0.14;
+const bgMusic = $('bgMusic');
+bgMusic.volume = BG_MUSIC_VOLUME;
+let musicOn = true;
+try { musicOn = localStorage.getItem('world_music') !== '0'; } catch(_){}
+bgMusic.muted = !musicOn;
+function tryPlayMusic(){
+  bgMusic.play().then(() => { document.removeEventListener('pointerdown', tryPlayMusic); }).catch(() => {});
+}
+document.addEventListener('pointerdown', tryPlayMusic);
+function applyMusicBtn(){ $('music').textContent = musicOn ? '🎵' : '🔇'; }
+applyMusicBtn();
+$('music').addEventListener('click', () => {
+  musicOn = !musicOn; bgMusic.muted = !musicOn;
+  try { localStorage.setItem('world_music', musicOn ? '1' : '0'); } catch(_){}
+  applyMusicBtn();
+});
+
+$('rules').addEventListener('click', () => {
+  if (!$('msg').hidden && $('msgText').textContent === t('rules_text')) { $('msg').hidden = true; return; }
+  showMsg(t('rules_text'), t('btn_ok'));
+});
+
+function update(dt){
+  const my = myEnt();
+  // ввод → сервер (20 раз/сек максимум, только при изменении; раз в секунду как пульс)
+  let dx = 0, dy = 0;
+  if (keys.ArrowLeft || keys.KeyA) dx -= 1;
+  if (keys.ArrowRight || keys.KeyD) dx += 1;
+  if (keys.ArrowUp || keys.KeyW) dy -= 1;
+  if (keys.ArrowDown || keys.KeyS) dy += 1;
+  const canSprint = me.stm > 0;   // шкала бега кончилась — сервер всё равно урежет до шага, не просим зря (иначе будет дёргаться при коррекции позиции)
+  let run = (keys.ShiftLeft || keys.ShiftRight) && canSprint ? 1.3 : 1;   // держим тот же потолок, что и сервер (RUN_CAP)
+  if (joy.active && (joy.vx || joy.vy)){ dx = joy.vx; dy = joy.vy; run = (Math.hypot(dx,dy) > 0.9 && canSprint) ? 1.3 : 1; }
+  const blk = !!(keys.Space || blockHeld);
+  const inp = { t:'in', dx:+dx.toFixed(2), dy:+dy.toFixed(2), run, blk };
+  const sig = inp.dx+'|'+inp.dy+'|'+run+'|'+blk, now = performance.now();
+  const isMoving = dx !== 0 || dy !== 0;
+  const justStopped = !isMoving && me.wasMoving;   // отпустили кнопку/джойстик — шлём "стоп" сразу, без троттлинга 45мс (иначе персонажа ещё доносит вперёд)
+  if (connected && (sig !== me.sent && (justStopped || now - me.sentAt > 45) || now - me.sentAt > 1000)){ sendWs(inp); me.sent = sig; me.sentAt = now; }
+  me.wasMoving = isMoving;
+  me.moving = isMoving;
+
+  // предсказание своей позиции (те же формулы, что на сервере)
+  if (my){
+    const s = my.s, locked = s === ST.hurt || s === ST.ko;
+    const slow = locked ? 0 : (s >= 2 && s <= 4) ? 0.15 : s === ST.block ? 0.35 : 1;
+    const len = Math.hypot(dx, dy) || 1, k = Math.min(1, len);
+    const sp = me.sp * run * slow;
+    if (room === 'club'){ me.x += dx/len*k*sp*dt; me.y += dy/len*k*sp*0.6*dt; clubConstrainMe(); }
+    else if (room === 'garage'){ me.x += dx/len*k*sp*dt; me.y += dy/len*k*sp*0.6*dt; garageConstrainMe(); }
+    else if (room === 'pizzeria'){ me.x += dx/len*k*sp*dt; me.y += dy/len*k*sp*0.6*dt; pizzeriaConstrainMe(); }
+    else {
+      me.x = wrapX(me.x + dx/len*k*sp*dt);
+      me.y = Math.max(GROUND_MIN, Math.min(GROUND_MAX, me.y + dy/len*k*sp*0.6*dt));
+    }
+    // лёгкий звук шагов — только свой, только когда реально идёшь (не в ударе/блоке/лежишь)
+    if ((dx || dy) && !locked && s !== ST.block && !(s >= 2 && s <= 4)){
+      stepTimer -= dt;
+      if (stepTimer <= 0){ playStep(); stepTimer = run > 1 ? 0.22 : 0.34; }
+    } else stepTimer = 0;
+  }
+  // сглаживание чужих
+  const a = 1 - Math.exp(-dt*14);
+  for (const e of ents.values()){
+    e.t += dt;
+    if (e.id === myId){ e.rx = me.x; e.ry = me.y; } else { e.rx += wrapDelta(e.rx, e.x)*a; e.ry += (e.y - e.ry)*a; }
+  }
+  for (const f of ui.floaters) f.t += dt;
+  ui.floaters = ui.floaters.filter(f => f.t < 1.1);
+  for (const t of ui.toasts) t.t -= dt; ui.toasts = ui.toasts.filter(t => t.t > 0);
+  for (const c of ui.chatFeed) c.t -= dt; ui.chatFeed = ui.chatFeed.filter(c => c.t > 0);
+  if (ui.banner){ ui.banner.t -= dt; if (ui.banner.t <= 0) ui.banner = null; }
+  if (ui.koText > 0) ui.koText -= dt;
+  if (ui.fade > 0) ui.fade -= dt;
+  if (room === 'club' || room === 'garage' || room === 'pizzeria') camX = 0;
+  else {
+    // мир — кольцо, у камеры больше нет краёв (никакого clamp по WORLD_W): цель берём ближайшим
+    // "развёрнутым" представлением относительно текущей camX, иначе на стыке мира камеру дёрнет
+    // на всю ширину карты. camX сам продолжает свободно расти/убывать — это ожидаемо и нормально.
+    const target = nearestWrap(me.x - CW/2, camX);
+    // всегда мягко следуем за целью (без резкого снапа при остановке — он дёргает картинку рывком);
+    // раньше без снапа была видна "докатка", но её убрали в источнике (me.x больше не доезжает после стопа),
+    // так что теперь цель сама не двигается после остановки и камера сходится к ней плавно, без рывка
+    camX += (target - camX) * Math.min(1, dt*10);
+  }
+}
+
+// ═══════════════ РИСОВАНИЕ ═══════════════
+function rr(x, y, w, h, r){
+  ctx.beginPath(); ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+}
+function txt(s, x, y, size, color, align, maxW){
+  ctx.font = `bold ${size}px "Arial Black", Arial`; ctx.textAlign = align || 'center'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = Math.max(3, size/6);
+  if (maxW){ ctx.strokeText(s, x, y, maxW); ctx.fillStyle = color; ctx.fillText(s, x, y, maxW); }
+  else { ctx.strokeText(s, x, y); ctx.fillStyle = color; ctx.fillText(s, x, y); }
+}
+function bar(x, y, w, h, frac, col){
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; rr(x, y, w, h, h/2); ctx.fill();
+  const fw = Math.max(0, Math.min(1, frac)) * w;
+  if (fw > 0){ ctx.fillStyle = col; rr(x, y, Math.max(h, fw), h, h/2); ctx.fill(); }
+}
+const addHit = (x, y, w, h, fn) => ui.hits.push({ x, y, w, h, fn });
+const ready = im => im.complete && im.naturalWidth;
+
+function drawSky(){
+  ctx.fillStyle = '#05010c'; ctx.fillRect(0, 0, CW, WALL_Y); ctx.fillStyle = '#fff';
+  for (let i=0;i<70;i++){
+    const x = ((i*911) % 2600) - camX*0.08, px = ((x % 2600) + 2600) % 2600 - 660;
+    ctx.globalAlpha = 0.35 + ((i*7)%10)/18; ctx.fillRect(px, ((i*53) % 60) + 6, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  if (ready(BACK)){
+    const sc = (WALL_Y - 30) / BACK.naturalHeight, tw = BACK.naturalWidth * sc, off = -((camX*0.35) % tw);
+    for (let x = off; x < CW; x += tw) ctx.drawImage(BACK, x, 30, tw, WALL_Y - 30);
+  }
+}
+function drawRoad(){
+  const tw = ROAD.sw*S, th = ROAD.sh*S, off = -(camX % tw);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, ROAD_TOP, CW, CH-ROAD_TOP); ctx.clip();
+  if (ready(TILESET)) for (let x = off; x < CW; x += tw) ctx.drawImage(TILESET, ROAD.sx, ROAD.sy, ROAD.sw, ROAD.sh, x, ROAD_TOP, tw, th);
+  else { ctx.fillStyle = '#26364a'; ctx.fillRect(0, ROAD_TOP, CW, CH-ROAD_TOP); }
+  const g = ctx.createLinearGradient(0, ROAD_TOP, 0, CH); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = g; ctx.fillRect(0, ROAD_TOP, CW, CH-ROAD_TOP); ctx.restore();
+}
+function drawWalls(){
+  // мир — кольцо: вместо диапазона z0..z1 просто перебираем все 7 районов и берём для каждого
+  // ближайшее к камере "развёрнутое" положение — те, что вне экрана, отсеиваются сразу
+  for (let z=0; z<ZONES.length; z++){
+    const zx = nearestWrap(z*ZONE_W, camX) - camX;
+    if (zx > CW || zx + ZONE_W < 0) continue;
+    const zone = ZONES[z];
+    ctx.save(); ctx.beginPath(); ctx.rect(zx, 0, ZONE_W, CH); ctx.clip();
+    let x = zx, i = 0;
+    while (x < zx + ZONE_W){
+      const tile = T[zone.seq[i % zone.seq.length]], tw = tile.sw*S, th = tile.sh*(WALL_H/96);
+      if (x + tw > 0 && x < CW && ready(TILESET)) ctx.drawImage(TILESET, tile.sx, tile.sy, tile.sw, tile.sh, x, WALL_Y, tw, th);
+      x += tw; i++;
+    }
+    ctx.fillStyle = '#2b2129'; ctx.fillRect(zx, WALL_Y-13, ZONE_W, 17);
+    ctx.fillStyle = '#6b5f68'; ctx.fillRect(zx, WALL_Y-13, ZONE_W, 4);
+    const tint = zone.tint || TYPES[zone.type].tint;
+    if (tint){ ctx.fillStyle = tint; ctx.fillRect(zx, WALL_Y, ZONE_W, CH-WALL_Y); }
+    ctx.restore();
+  }
+}
+function drawLamps(){
+  if (!ready(FORE)) return;
+  const fw = LAMP.sw*S, fh = LAMP.sh*S, first = Math.floor(camX/640) - 1, last = Math.ceil((camX+CW)/640) + 1;
+  for (let i=first; i<=last; i++) ctx.drawImage(FORE, LAMP.sx, LAMP.sy, LAMP.sw, LAMP.sh, i*640 + 320 - camX, WALL_Y - fh*0.35, fw, fh);
+}
+// ── вход в клуб: перенесён из TikTok-версии Street Fighter (drawSpotBeam / drawVelvetRope / drawClubEntrance) ──
+function drawSpotBeam(x, groundY, topY, tiltPx, color){
+  ctx.save();
+  const grad = ctx.createLinearGradient(x, groundY, x+tiltPx, topY);
+  grad.addColorStop(0, color.replace('ALPHA','0.55'));
+  grad.addColorStop(1, color.replace('ALPHA','0'));
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(x-16, groundY); ctx.lineTo(x+16, groundY); ctx.lineTo(x+tiltPx+3, topY); ctx.lineTo(x+tiltPx-3, topY);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawVelvetRope(x1, x2, groundY, h){
+  ctx.save();
+  [x1,x2].forEach(x=>{
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(x-2, groundY-h, 4, h);
+    ctx.fillStyle = '#c9a63f';
+    ctx.beginPath(); ctx.arc(x, groundY-h-3, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, groundY, 6, 2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, groundY+1, 7, 2.5, 0, 0, Math.PI*2); ctx.fill();
+  });
+  const sagY = groundY-h*0.6;
+  ctx.strokeStyle = '#a01830'; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(x1, groundY-h+4); ctx.quadraticCurveTo((x1+x2)/2, sagY+10, x2, groundY-h+4); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x1, groundY-h+3); ctx.quadraticCurveTo((x1+x2)/2, sagY+8, x2, groundY-h+3); ctx.stroke();
+  ctx.restore();
+}
+// координаты локальные: земля — y=0, центр двери — cx0 (снаружи вызывается через translate/scale)
+function drawClubEntrance(cx0, text, t){
+  const doorW = 56, doorH = 81, doorY = -doorH, doorX = cx0 - doorW/2;
+  const colW = 7, colGap = 10, segH = 14;
+  [doorX-colGap-colW, doorX+doorW+colGap].forEach((cx,i)=>{
+    const segs = Math.ceil(doorH/segH);
+    for (let sg=0; sg<segs; sg++){
+      const sy = doorY + sg*segH;
+      const on = ((sg + Math.floor((t||0)/220)) % 2)===0;
+      ctx.fillStyle = on ? (i===0?'#ff2fb0':'#2fe0ff') : 'rgba(255,255,255,0.15)';
+      if (on){ ctx.shadowColor = i===0?'#ff8fe0':'#9df5ff'; ctx.shadowBlur=8; } else ctx.shadowBlur=0;
+      ctx.fillRect(cx, sy+1, colW, segH-2);
+    }
+  });
+  ctx.shadowBlur=0;
+  ctx.fillStyle = '#0a0a0c'; ctx.fillRect(doorX-6, doorY-4, doorW+12, doorH+4);
+  const leafW = doorW/2;
+  const doorGrad = ctx.createLinearGradient(doorX,doorY,doorX+doorW,doorY);
+  doorGrad.addColorStop(0,'#2b1b12'); doorGrad.addColorStop(1,'#1a100b');
+  ctx.fillStyle = doorGrad;
+  ctx.fillRect(doorX, doorY, leafW-2, doorH); ctx.fillRect(doorX+leafW+2, doorY, leafW-2, doorH);
+  ctx.fillStyle = '#cfd6dc';
+  ctx.fillRect(doorX+leafW-6, doorY+doorH*0.35, 3, doorH*0.28); ctx.fillRect(doorX+leafW+3, doorY+doorH*0.35, 3, doorH*0.28);
+  const gapGlow = ctx.createLinearGradient(doorX+leafW-4,0,doorX+leafW+6,0);
+  gapGlow.addColorStop(0,'rgba(255,80,200,0)'); gapGlow.addColorStop(0.5,'rgba(255,120,220,0.95)'); gapGlow.addColorStop(1,'rgba(255,80,200,0)');
+  ctx.fillStyle = gapGlow; ctx.fillRect(doorX+leafW-4, doorY, 10, doorH);
+  ctx.fillStyle = '#3a3a3f'; ctx.fillRect(doorX-10, -3, doorW+20, 5);
+  const canW = doorW+52, canH = 24, canX = cx0-canW/2, canY = doorY-canH;
+  const canGrad = ctx.createLinearGradient(canX,canY,canX,canY+canH);
+  canGrad.addColorStop(0,'#160a12'); canGrad.addColorStop(1,'#2c0f1e');
+  ctx.fillStyle = canGrad; ctx.fillRect(canX, canY, canW, canH);
+  ctx.strokeStyle = '#ff2fb0'; ctx.lineWidth = 1.5; ctx.strokeRect(canX,canY,canW,canH);
+  const bN = Math.floor(canW/10);
+  for (let i=0;i<bN;i++){
+    const on = Math.sin(i*1.9 + (t||0)*0.004) > 0;
+    ctx.fillStyle = on ? '#fff4c2' : 'rgba(255,244,194,0.2)';
+    if (on){ ctx.shadowColor='#ffe789'; ctx.shadowBlur=4; } else ctx.shadowBlur=0;
+    ctx.beginPath(); ctx.arc(canX+6+i*10, canY+canH-2, 1.6, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.save();
+  ctx.shadowColor = '#ff2fb0'; ctx.shadowBlur = 8; ctx.fillStyle = '#ff8fe0';
+  ctx.font = 'bold ' + (canH*0.55) + 'px Arial Black'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, canX+canW/2, canY+canH/2 - 1);
+  ctx.restore();
+}
+function drawNeon(zx){
+  const cx = zx + ZONE_W/2, t = performance.now();
+  drawSpotBeam(cx-165, WALL_Y+10, 0, -85, 'rgba(255,60,220,ALPHA)');
+  drawSpotBeam(cx+165, WALL_Y+10, 0,  85, 'rgba(80,220,255,ALPHA)');
+  ctx.save(); ctx.translate(cx, ROAD_TOP); ctx.scale(1.45, 1.45);    // размер под наших бойцов
+  drawClubEntrance(0, 'CLUB 21', t);
+  drawVelvetRope(-45, 45, 2, 30);
+  ctx.restore();
+}
+function drawZoneDecor(){
+  for (let z=0; z<ZONES.length; z++){
+    const zx = nearestWrap(z*ZONE_W, camX) - camX;
+    if (zx > CW || zx + ZONE_W < 0) continue;
+    if (ZONES[z].neon) drawNeon(zx);
+  }
+  const rank = k => ({hub:0,safe:1,wild:2,wild2:3})[ZONES[k].type];
+  // теперь включая z=0 — это стык между последним районом (z6) и первым (z0), кольцо замкнуто
+  for (let z=0; z<ZONES.length; z++){
+    const bx = nearestWrap(z*ZONE_W, camX) - camX;
+    if (bx < -300 || bx > CW+300) continue;
+    const prevZ = (z - 1 + ZONES.length) % ZONES.length;
+    const col = TYPES[ZONES[rank(prevZ) > rank(z) ? prevZ : z].type].color;
+    ctx.save(); ctx.beginPath(); ctx.rect(bx-7, ROAD_TOP, 14, CH-ROAD_TOP); ctx.clip();
+    for (let y=ROAD_TOP; y<CH; y+=26){ ctx.fillStyle = ((y-ROAD_TOP)/26)%2 ? '#111' : col; ctx.fillRect(bx-7, y, 14, 26); }
+    ctx.restore();
+  }
+}
+
+function drawActor(e){
+  if (!A[e.ty]) return;
+  const k = actorK(e), h = FIGHTER_H*k, sx = nearestWrap(e.rx, camX) - camX;
+  if (sx < -200 || sx > CW+200) return;
+  const anim = ST_ANIM[e.s] || 'idle', def = A[e.ty][anim];
+  const list = framesOf(e.ty, e.v, anim), n = list.length, fps = def[3];
+  let idx = Math.floor(e.t * fps);
+  idx = (anim === 'idle' || anim === 'walk') ? idx % n : Math.min(n-1, idx);
+  if (e.s === ST.ko) idx = A[e.ty].lying ? Math.min(n-1, Math.floor(e.t * 9)) : 0;   // панк: падает кадрами до «лежит»; остальные: стоячий кадр, кладём поворотом
+  // нокаут без готового «лежачего» кадра (все, кроме панка): берём СТОЯЧИЙ кадр и кладём поворотом на 90° (кадры удара у них уже наклонены)
+  const frame = (e.s === ST.ko && !A[e.ty].lying) ? framesOf(e.ty, e.v, 'idle')[0] : list[idx];
+
+  // нокаут: падает НАЗАД на спину и лежит ровно горизонтально (ровно 90°, плавное замедление к концу падения)
+  const koP = e.s === ST.ko ? (1 - Math.pow(1 - Math.min(1, e.t / 0.35), 2)) : 0;
+  ctx.save(); ctx.globalAlpha = 0.28; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(sx, e.ry, (34 + 46*koP)*k, (8 + 3*koP)*k, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+  if (ready(frame)){
+    let sc = h / frame.naturalHeight;
+    if (frame.naturalWidth*sc > h*1.55) sc = h*1.55 / frame.naturalWidth;
+    const dw = frame.naturalWidth*sc, dh = frame.naturalHeight*sc;
+    ctx.save();
+    if (e.s === ST.ko && !A[e.ty].lying){
+      // поворот делаем в координатах экрана ДО зеркалирования: голова уходит назад от взгляда, спина ложится на землю ровно (90°)
+      ctx.translate(sx, e.ry - dw*0.22*koP);
+      ctx.rotate(-e.f * koP * Math.PI / 2);
+    } else ctx.translate(sx, e.ry);
+    if (e.s === ST.ko) ctx.globalAlpha = Math.max(0.2, 1 - Math.max(0, e.t - 1.4) / 0.6);
+    if ((e.f < 0) !== !!A[e.ty].left) ctx.scale(-1, 1);   // у панка исходный взгляд влево
+    ctx.drawImage(frame, -dw/2, -dh + 6, dw, dh);
+    ctx.restore();
+  }
+  if (e.s === ST.block){
+    ctx.save(); ctx.translate(sx, e.ry - h*0.5); ctx.scale(e.f, 1);
+    ctx.strokeStyle = 'rgba(110,190,255,0.85)'; ctx.lineWidth = 6; ctx.shadowColor = '#4aa8ff'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(28*k, 0, h*0.42, -1.05, 1.05); ctx.stroke(); ctx.restore();
+  }
+  if (e.s === ST.ko) return;
+
+  const ny = e.ry - h - 6;
+  if (e.c) bar(sx-34, ny-24, 68, 8, e.h/e.m, e.h/e.m > 0.35 ? '#4be06f' : '#ff5a5a');
+  const isMe = e.id === myId, isBot = e.k === 'b';
+  const zt = (room === 'club' || room === 'garage' || room === 'pizzeria') ? 'hub' : ZONES[zoneAt(e.rx)].type;
+  ctx.font = 'bold 15px Arial';
+  // у бота под ним и так видно, что это бот (нет ника/тега) — незачем подписывать ещё и "Панк"
+  const name = isBot ? '' : ((e.cl && clanTags[e.cl]) ? '['+clanTags[e.cl]+'] ' : '') + e.n, nameW = isBot ? 0 : ctx.measureText(name).width;
+  const pill = t('pill') + e.l, pw = ctx.measureText(pill).width + 10, total = isBot ? pw : pw + 6 + nameW, x0 = sx - total/2;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; rr(x0-6, ny-15, total+12, 21, 6); ctx.fill();
+  ctx.fillStyle = isMe ? '#b8860b' : isBot ? '#7a2a2a' : '#3a4a8a'; rr(x0, ny-12, pw, 16, 5); ctx.fill();
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(pill, x0 + pw/2, ny);
+  if (!isBot){
+    ctx.textAlign = 'left'; const mate = !isMe && e.cl && e.cl === myClanId();
+    ctx.fillStyle = isMe ? '#ffd23f' : mate ? '#7fe3ff' : (zt === 'wild' || zt === 'wild2') ? '#ff8a8a' : '#fff';
+    ctx.fillText(name, x0 + pw + 6, ny + 1);
+  }
+}
+function drawFloaters(){
+  for (const f of ui.floaters){
+    ctx.globalAlpha = Math.max(0, 1 - f.t/1.1);
+    txt(f.text, nearestWrap(f.e.rx, camX) - camX, f.e.ry - FIGHTER_H - 30 - f.t*50, 24, f.color);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD(){
+  const my = myEnt(), zone = ZONES[zoneAt(me.x)], ty = TYPES[zone.type];
+  const hp = my ? my.h : 0, mx = my ? my.m : 100, lvl = my ? my.l : 1;
+  const stm = me.stm != null ? me.stm : 100;
+  ctx.fillStyle = 'rgba(8,8,16,0.82)'; rr(16, 16, 330, 108, 12); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,210,63,0.7)'; ctx.lineWidth = 2; rr(16, 16, 330, 108, 12); ctx.stroke();
+  ctx.fillStyle = '#b8860b'; ctx.beginPath(); ctx.arc(58, 66, 30, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke();
+  txt(String(lvl), 58, 76, 26, '#fff'); txt(t('lvl_big'), 58, 46, 11, '#ffe9a0');
+  // сила — под кружком уровня, чтобы была видна и без открытия панели персонажа
+  txt(t('lbl_str'), 58, 107, 10, '#ffb37a'); txt(String(me.st.str||0), 58, 122, 18, '#ff8a4a');
+  txt(my ? my.n : '…', 100, 44, 20, '#ffd23f', 'left', 180);
+  txt('$ ' + (me.mo || 0), 338, 44, 15, '#7dff9a', 'right');
+  // 1) здоровье — подпись прямо на шкале, чтобы было однозначно видно, что это
+  bar(100, 54, 230, 16, hp/mx, hp/mx > 0.35 ? '#4be06f' : '#ff5a5a');
+  txt(t('lbl_hp', hp, mx), 215, 67, 12, '#fff');
+  // 2) шкала бега — тратится, пока держишь бег, восстанавливается на шаге
+  bar(100, 76, 230, 14, stm/100, stm > 25 ? '#ffb347' : '#ff6b3d');
+  txt(t('lbl_run', Math.round(stm), 100), 215, 88, 11, '#fff');
+  // 3) опыт — подпись прямо внутри шкалы
+  bar(100, 96, 230, 14, me.xp/me.need, '#5fa8ff');
+  txt(t('xp', Math.floor(me.xp), me.need), 215, 108, 11, '#fff');
+
+  if (me.pt > 0){
+    ctx.globalAlpha = 0.75 + 0.25*Math.sin(performance.now()*0.008); ctx.fillStyle = '#ff9d2e'; rr(16, 132, 170, 34, 10); ctx.fill(); ctx.globalAlpha = 1;
+    txt(t('points', me.pt), 101, 156, 16, '#fff');
+    addHit(16, 132, 170, 34, () => { ui.panel = true; ui.card = null; });
+  }
+
+  // Чат — кнопка слева под основной плашкой (перенесена сюда с правого верхнего угла по просьбе
+  // пользователя); прямо под ней всплывают последние реплики (см. drawOverlays/ui.chatFeed).
+  // Если плашки "★ Очки" сейчас нет — кнопка поднимается на её место, чтобы не было пустого зазора
+  { const hasUnread = chatUnread > 0, cy = me.pt > 0 ? 172 : 132;
+    ctx.fillStyle = 'rgba(8,8,16,0.82)'; rr(16, cy, 170, 34, 10); ctx.fill();
+    ctx.strokeStyle = hasUnread ? '#ffd23f' : 'rgba(125,200,255,0.6)'; ctx.lineWidth = 2; rr(16, cy, 170, 34, 10); ctx.stroke();
+    txt(t('chat_btn'), 101, cy+23, 15, '#dfe6ff');
+    if (hasUnread){ ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(178, cy+4, 9, 0, Math.PI*2); ctx.fill(); txt(String(Math.min(9,chatUnread)) + (chatUnread>9?'+':''), 178, cy+9, 11, '#fff'); }
+    addHit(16, cy, 170, 34, () => openChat());
+    if (isMod){
+      ctx.fillStyle = 'rgba(8,8,16,0.82)'; rr(194, cy, 110, 34, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,210,63,0.8)'; ctx.lineWidth = 2; rr(194, cy, 110, 34, 10); ctx.stroke();
+      txt('Админка', 249, cy+23, 15, '#ffd23f');
+      addHit(194, cy, 110, 34, () => openAdm());
+    } }
+
+  ctx.fillStyle = 'rgba(8,8,16,0.82)'; rr(RX-150, 50, 150, 34, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(140,170,255,0.6)'; ctx.lineWidth = 2; rr(RX-150, 50, 150, 34, 10); ctx.stroke();
+  txt(t('menu'), RX-75, 73, 15, '#dfe6ff');
+  addHit(RX-150, 50, 150, 34, () => { ui.panel = !ui.panel; ui.card = null; ui.clanPanel = false; });
+  { const bx = RX-150-8-104, hasInv = clanState.invites.length > 0;
+    ctx.fillStyle = 'rgba(8,8,16,0.82)'; rr(bx, 50, 104, 34, 10); ctx.fill();
+    ctx.strokeStyle = hasInv ? '#ffd23f' : 'rgba(125,200,255,0.6)'; ctx.lineWidth = 2; rr(bx, 50, 104, 34, 10); ctx.stroke();
+    txt(t('clan_btn'), bx+52, 73, 15, '#dfe6ff', 'center', 96);
+    if (hasInv){ ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(bx+100, 54, 9, 0, Math.PI*2); ctx.fill(); txt(String(clanState.invites.length), bx+100, 59, 11, '#fff'); }
+    addHit(bx, 50, 104, 34, () => { if (ui.clanPanel) ui.clanPanel = false; else openClanPanel(); }); }
+
+  if (!ui.touch){
+    ctx.font = '12px Arial'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(210,220,245,0.9)';
+    [t('hint1'), t('hint2'), t('hint3')]
+      .forEach((s,i) => { ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=3; ctx.strokeText(s, RX, 106+i*17); ctx.fillText(s, RX, 106+i*17); });
+  }
+}
+// ── круговая мини-карта (21.09.2026, вместо линейной полоски вверху — мир теперь кольцо):
+// свёрнутая — маленькое кольцо в правом нижнем углу, тап по нему раскрывает крупную версию по
+// центру экрана с подписанными районами. Район "площадь" всегда наверху (12 часов), дальше по
+// кругу — реальный порядок районов в мире (см. angleForX), стык z6↔z0 внизу.
+const angleForX = x => -Math.PI/2 + (wrapX(x)/WORLD_W - 0.5) * Math.PI*2;
+function drawMiniMap(){
+  if (room === 'club' || room === 'garage' || room === 'pizzeria') return;
+  const myZone = zoneAt(me.x);
+  const wedge = (cx,cy,rIn,rOut,a0,a1,color,alpha) => {
+    ctx.globalAlpha = alpha; ctx.beginPath(); ctx.arc(cx,cy,rOut,a0,a1); ctx.arc(cx,cy,rIn,a1,a0,true); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+  };
+  if (ui.mapExpanded){
+    const cx = CW/2, cy = CH/2, rOut = Math.min(CW,CH)*0.24, rIn = rOut*0.55;
+    addHit(0, 0, CW, CH, () => { ui.mapExpanded = false; });   // тап вне круга — закрыть
+    ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.fillRect(0, 0, CW, CH);
+    for (let z=0; z<ZONES.length; z++){
+      const a0 = -Math.PI/2 + (z/7 - 0.5)*Math.PI*2, a1 = -Math.PI/2 + ((z+1)/7 - 0.5)*Math.PI*2;
+      wedge(cx, cy, rIn, rOut, a0, a1, TYPES[ZONES[z].type].color, z === myZone ? 0.95 : 0.55);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 2;
+    for (let z=0; z<ZONES.length; z++){
+      const a0 = -Math.PI/2 + (z/7 - 0.5)*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a0)*rIn, cy+Math.sin(a0)*rIn); ctx.lineTo(cx+Math.cos(a0)*rOut, cy+Math.sin(a0)*rOut); ctx.stroke();
+    }
+    for (let z=0; z<ZONES.length; z++){
+      const am = -Math.PI/2 + ((z+0.5)/7 - 0.5)*Math.PI*2;
+      txt(ZONES[z].name, cx+Math.cos(am)*(rOut+30), cy+Math.sin(am)*(rOut+30)+5, 15, z === myZone ? '#ffd23f' : '#dfe6ff', 'center', 150);
+    }
+    const dot = (ang, col, rad) => { const px = cx+Math.cos(ang)*(rIn+rOut)/2, py = cy+Math.sin(ang)*(rIn+rOut)/2; ctx.beginPath(); ctx.arc(px,py,rad,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=1.5; ctx.stroke(); };
+    for (const q of miniPlayers) dot(angleForX(q[0]), q[1] ? '#2bff6b' : '#ff3b3b', 5);
+    dot(angleForX(me.x), '#ffffff', 7);
+    addHit(cx-rOut, cy-rOut, rOut*2, rOut*2, () => {});   // тап по самому кольцу — не закрывать
+    ctx.fillStyle = 'rgba(8,8,16,0.9)'; ctx.beginPath(); ctx.arc(cx, cy-rOut-56, 20, 0, Math.PI*2); ctx.fill();
+    txt('✕', cx, cy-rOut-50, 20, '#ff8a8a');
+    addHit(cx-20, cy-rOut-76, 40, 40, () => { ui.mapExpanded = false; });
+  } else {
+    // позиция по второму фото пользователя (прямой, неповёрнутый вид) — сразу под кнопкой
+    // «Персонаж» (946-1208 → под правой половиной), масштаб/сдвиг найден по расстоянию
+    // между кнопками «Клан»/«Персонаж» на фото и сверен с прошлой (уже подтверждённой) позицией
+    const R = 46, rIn = 26, cx = 1100, cy = 165;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(cx,cy,R+6,0,Math.PI*2); ctx.fill();
+    for (let z=0; z<ZONES.length; z++){
+      const a0 = -Math.PI/2 + (z/7 - 0.5)*Math.PI*2, a1 = -Math.PI/2 + ((z+1)/7 - 0.5)*Math.PI*2;
+      wedge(cx, cy, rIn, R, a0, a1, TYPES[ZONES[z].type].color, z === myZone ? 0.95 : 0.5);
+    }
+    const dot = (ang, col, rad) => { const px = cx+Math.cos(ang)*(rIn+R)/2, py = cy+Math.sin(ang)*(rIn+R)/2; ctx.beginPath(); ctx.arc(px,py,rad,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=1.2; ctx.stroke(); };
+    for (const q of miniPlayers) dot(angleForX(q[0]), q[1] ? '#2bff6b' : '#ff3b3b', 2.6);
+    dot(angleForX(me.x), '#ffffff', 3.6);
+    addHit(cx-R-6, cy-R-6, (R+6)*2, (R+6)*2, () => { ui.mapExpanded = true; });
+  }
+}
+// ── «Суперсила»: заряжается раз в минуту; кнопка заполняется снизу вверх, готовая — светится ──
+const superRemain = () => Math.max(0, (me.su || 0) - (performance.now() - (me.suStamp || 0)) / 1000);
+function drawSuperButton(b){
+  const rem = superRemain(), frac = 1 - Math.min(1, rem / SUPER_COOLDOWN), ready = rem <= 0.05, pulse = 0.6 + 0.4*Math.sin(performance.now()*0.008);
+  ctx.save();
+  ctx.globalAlpha = 0.85; ctx.fillStyle = '#2a2233'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();          // основа
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r-3, 0, Math.PI*2); ctx.clip();                                                            // «жидкость» внутри круга
+  ctx.fillStyle = ready ? '#ffc933' : '#c98a1a'; ctx.globalAlpha = ready ? 0.7 + 0.25*pulse : 0.85;
+  ctx.fillRect(b.x - b.r, b.y + b.r - 2*b.r*frac, 2*b.r, 2*b.r*frac);
+  ctx.restore();
+  ctx.save();
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r-2, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = ready ? '#fff2a8' : '#ffe066';                                                                                 // кольцо-индикатор по часовой
+  if (ready){ ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 18 + 14*pulse; }
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r-2, -Math.PI/2, -Math.PI/2 + Math.PI*2*frac); ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = (b.down && ready) ? 1 : 0.95;
+  txt(b.label, b.x, b.y + (ready ? 6 : 0), 16, ready ? '#fff' : '#f2e6c8');
+  if (!ready) txt(Math.ceil(rem) + t('sec'), b.x, b.y + 22, 14, '#fff');
+  ctx.globalAlpha = 1;
+}
+function drawControls(){
+  if (!ui.touch) return;
+  if (joy.active){
+    ctx.globalAlpha = 0.28; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(joy.ox, joy.oy, 70, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    const dx = joy.x-joy.ox, dy = joy.y-joy.oy, len = Math.hypot(dx,dy) || 1, m = Math.min(len, 70);
+    ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(joy.ox + dx/len*m, joy.oy + dy/len*m, 30, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+  } else {
+    ctx.globalAlpha = 0.16; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(170, 590, 70, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 0.5; txt(t('walk'), 170, 596, 14, '#fff'); ctx.globalAlpha = 1;
+  }
+  for (const b of btns){
+    if (b.name === 'super'){ drawSuperButton(b); continue; }
+    const on = b.down;
+    ctx.globalAlpha = on ? 0.95 : 0.55; ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, b.r*(on?0.94:1), 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke(); ctx.globalAlpha = 1;
+    txt(b.label, b.x, b.y + 6, b.r > 60 ? 20 : 16, '#fff');
+  }
+}
+function drawCard(){
+  const a = ui.card; if (!a) return;
+  const w = 400, h = 290 + (a.canMod ? 50 : 0), x = (CW-w)/2, y = 150;
+  ctx.fillStyle = 'rgba(8,8,16,0.94)'; rr(x, y, w, h, 14); ctx.fill();
+  ctx.strokeStyle = '#8ab4ff'; ctx.lineWidth = 2.5; rr(x, y, w, h, 14); ctx.stroke();
+  addHit(x, y, w, h, () => {});
+  txt((a.boss ? '👑 ' : '') + (a.kind === 'b' ? t('f_'+a.ty) : ((a.tag ? '['+a.tag+'] ' : '') + a.name)), x+20, y+40, 26, a.ally ? '#7fe3ff' : (a.boss ? '#ffd23f' : '#fff'), 'left', 260); txt(t('lvl_word', a.level), x+w-56, y+40, 22, '#ffd23f', 'right');
+  txt('✕', x+w-24, y+36, 24, '#ff8a8a'); addHit(x+w-50, y+6, 44, 44, () => { ui.card = null; });
+  ctx.font = '14px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#9fb0d8';
+  ctx.fillText((a.kind === 'b' ? t('bot_prefix') : '') + t('fighter_lbl') + (A[a.ty] ? A[a.ty].name : ''), x+20, y+62);
+  bar(x+20, y+76, w-40, 16, a.hp/a.max, '#4be06f'); txt(a.hp+' / '+a.max, x+w/2, y+89, 12, '#fff');
+  [[t('st_str'), a.st.str, '#ff8a4a'], [t('st_hp'), a.st.hp, '#4be06f'], [t('st_spd'), a.st.spd, '#5fc8ff']].forEach((r,i) => {
+    const ry = y + 118 + i*30;
+    txt(r[0], x+20, ry+10, 16, '#dfe6ff', 'left'); bar(x+130, ry-2, w-190, 14, r[1]/20, r[2]); txt(String(r[1]), x+w-24, ry+11, 16, '#fff', 'right');
+  });
+  if (a.canMod){
+    const my2 = y + h - 118;
+    ctx.fillStyle = '#5a2a2a'; rr(x+20, my2, w-40, 42, 10); ctx.fill();
+    txt(t('mod_btn'), x+w/2, my2+28, 16, '#ffb3b3');
+    addHit(x+20, my2, w-40, 42, () => openModForm(a.name));
+  }
+  const by = y + h - 60;
+  let label, canDo = false;
+  if (a.kind === 'b') label = t('card_bot');
+  else if (a.ally) label = '🛡 ' + t('clan_card_ally');
+  else if (a.canInvite){ label = t('clan_invite_btn'); canDo = true; }
+  else if (!a.inClan) label = t('clan_card_hint_noclan');
+  else label = t('clan_card_hint_noleader');
+  ctx.fillStyle = canDo ? '#2f7fd0' : 'rgba(80,80,100,0.6)'; rr(x+20, by, w-40, 42, 10); ctx.fill();
+  txt(label, x+w/2, by+28, canDo ? 18 : 15, canDo ? '#fff' : '#b8c0d8', 'center', w-56);
+  addHit(x+20, by, w-40, 42, () => {
+    if (canDo){ sendWs({ t:'clan_invite', to:a.id }); ui.card = null; }
+    else if (a.kind === 'p' && !a.ally && !a.inClan){ openClanPanel(); }
+  });
+}
+function drawPanel(){
+  if (!ui.panel) return;
+  const dbg = isDebugOwner();
+  const my = myEnt(), w = 460, h = (dbg ? 424 : 360) + 44, x = (CW-w)/2, y = 120;
+  ctx.fillStyle = 'rgba(8,8,16,0.95)'; rr(x, y, w, h, 14); ctx.fill();
+  ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2.5; rr(x, y, w, h, 14); ctx.stroke();
+  addHit(x, y, w, h, () => {});
+  txt(t('panel_title', my && A[my.ty] ? A[my.ty].name : ''), x+22, y+40, 24, '#ffd23f', 'left', 340);
+  txt('✕', x+w-26, y+38, 24, '#ff8a8a'); addHit(x+w-52, y+6, 46, 46, () => { ui.panel = false; });
+  ctx.font = '16px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#dfe6ff';
+  ctx.fillText(t('panel_info', my ? my.l : 1, me.pt), x+22, y+72);
+  [['str',t('st_str'),t('d_str'),'#ff8a4a'],['hp',t('st_hp'),t('d_hp'),'#4be06f'],['spd',t('st_spd'),t('d_spd'),'#5fc8ff']].forEach((r,i) => {
+    const ry = y + 100 + i*66;
+    txt(r[1], x+22, ry+22, 20, '#fff', 'left');
+    ctx.font = '13px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#9fb0d8'; ctx.fillText(r[2], x+22, ry+42);
+    if (r[0] === 'str') { ctx.font = '13px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffd23f'; ctx.fillText(t('dmg_hint', me.dh||0, me.ds||0), x+22, ry+58); }
+    bar(x+190, ry+8, 150, 16, me.st[r[0]]/20, r[3]); txt(String(me.st[r[0]]), x+360, ry+24, 22, '#fff', 'right');
+    const capped = r[0] === 'spd' && me.st.spd >= 100;
+    const can = me.pt > 0 && !capped;
+    ctx.fillStyle = can ? '#ff9d2e' : 'rgba(80,80,100,0.6)'; rr(x+376, ry+2, 56, 40, 10); ctx.fill();
+    txt('+', x+404, ry+32, 28, can ? '#fff' : '#8a8aa0');
+    if (capped) { ctx.font = '10px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff8a8a'; ctx.fillText('MAX', x+404, ry+52); }
+    addHit(x+376, ry+2, 56, 40, () => { if (can) sendWs({ t:'spend', stat:r[0] }); });
+  });
+  if (dbg) {
+    const dy = y + 300;
+    ctx.font = '12px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#ff5a5a';
+    ctx.fillText('🛠 DEBUG — только у тебя, можно накрутить любые статы для теста', x+22, dy-8);
+    [['str',t('st_str')],['hp',t('st_hp')],['spd',t('st_spd')]].forEach((r,i) => {
+      const cx = x + 22 + i*145;
+      ctx.font = '12px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = '#9fb0d8';
+      ctx.fillText(r[1], cx+63, dy+14);
+      ctx.fillStyle = '#3a3a55'; rr(cx, dy+20, 60, 32, 8); ctx.fill();
+      txt('−10', cx+30, dy+41, 14, '#fff');
+      addHit(cx, dy+20, 60, 32, () => sendWs({ t:'debug_stat', stat:r[0], delta:-10 }));
+      ctx.fillStyle = '#3a3a55'; rr(cx+66, dy+20, 60, 32, 8); ctx.fill();
+      txt('+10', cx+96, dy+41, 14, '#fff');
+      addHit(cx+66, dy+20, 60, 32, () => sendWs({ t:'debug_stat', stat:r[0], delta:10 }));
+    });
+  }
+  ctx.fillStyle = '#3a3a55'; rr(x+w/2-110, y+h-96, 220, 34, 10); ctx.fill();
+  txt(t('change_fighter_btn'), x+w/2, y+h-73, 15, '#dfe6ff'); addHit(x+w/2-110, y+h-96, 220, 34, () => { ui.panel = false; openFighterSwitch(); });
+  ctx.font = '12px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = '#7f8db0';
+  ctx.fillText(t('no_reset'), x+w/2, y+h-52);
+  ctx.fillStyle = 'rgba(120,40,40,0.8)'; rr(x+w/2-70, y+h-40, 140, 30, 8); ctx.fill();
+  txt(t('logout'), x+w/2, y+h-19, 15, '#fff'); addHit(x+w/2-70, y+h-40, 140, 30, () => { stopRetry = true; logout(); });
+}
+function drawOverlays(){
+  if (ui.banner){
+    const b = ui.banner, a = Math.min(1, b.t/0.5);
+    ctx.globalAlpha = a*0.6; ctx.fillStyle = '#000'; ctx.fillRect(0, 300, CW, 110);
+    ctx.globalAlpha = a; txt(b.text, CW/2, 352, 40, '#ffd23f'); txt(b.sub, CW/2, 392, 20, '#fff'); ctx.globalAlpha = 1;
+  }
+  if (ui.koText > 0){
+    ctx.globalAlpha = Math.min(0.6, ui.koText/2); ctx.fillStyle = '#300'; ctx.fillRect(0, 0, CW, CH); ctx.globalAlpha = 1;
+    txt(t('ko'), CW/2, 340, 60, '#ff5a5a');
+  }
+  ui.toasts.forEach((t, i) => {
+    ctx.font = 'bold 18px Arial'; const w = ctx.measureText(t.text).width + 36, y = 640 - i*40 - (ui.touch ? 0 : 20);
+    ctx.globalAlpha = Math.min(1, t.t/0.4); ctx.fillStyle = 'rgba(8,8,16,0.88)'; rr(CW/2-w/2, y-24, w, 34, 10); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = t.color; ctx.fillText(t.text, CW/2, y); ctx.globalAlpha = 1;
+  });
+  // всплывающие реплики общего чата — прямо под кнопкой "Чат" слева (см. drawHUD), чтобы видеть
+  // сообщения на бегу, не открывая само окно. Специально НЕ внизу экрана — там на телефоне
+  // джойстик и кнопки боя, лента бы их перекрывала
+  const chatFeedBaseY = (me.pt > 0 ? 172 : 132) + 60;   // сразу под кнопкой "Чат" — та тоже "плавает" в зависимости от плашки "★ Очки"
+  ui.chatFeed.forEach((c, i) => {
+    const short = c.text.length > 60 ? c.text.slice(0, 60) + '…' : c.text;
+    const y = chatFeedBaseY + i * 30;
+    ctx.font = '17px Arial'; const full = c.u + ': ' + short, w = Math.min(640, ctx.measureText(full).width + 24);
+    ctx.globalAlpha = Math.min(1, c.t); ctx.fillStyle = 'rgba(8,8,16,0.75)'; rr(20, y-21, w, 30, 8); ctx.fill();
+    ctx.textAlign = 'left'; ctx.fillStyle = '#ffd23f'; ctx.fillText(c.u + ':', 30, y);
+    const nw = ctx.measureText(c.u + ':').width;
+    ctx.fillStyle = '#fff'; ctx.fillText(' ' + short, 30 + nw, y);
+    ctx.globalAlpha = 1;
+  });
+  if (ui.fade > 0){ ctx.globalAlpha = Math.min(1, ui.fade / 0.6); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CW, CH); ctx.globalAlpha = 1; }
+  if (!connected){
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, CW, CH);
+    txt(t('connecting'), CW/2, CH/2, 34, '#fff');
+  }
+}
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now-last)/1000); last = now;
+  if (connected) update(dt); else camX += 0;
+  ui.hits = [];
+  ctx.clearRect(0, 0, CW, CH);
+  if (room === 'club') drawClubScene();
+  else if (room === 'garage') drawGarageScene();
+  else if (room === 'pizzeria') drawPizzeriaScene();
+  else { drawSky(); drawRoad(); drawWalls(); drawLamps(); drawZoneDecor(); [...ents.values()].sort((a,b) => a.ry - b.ry).forEach(drawActor); }
+  drawFloaters();
+  if (connected){ drawHUD(); drawControls(); drawDoorPrompt(); drawCard(); drawPanel(); drawClanPanel(); drawMiniMap(); }
+  drawOverlays();
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════ НА ВЕСЬ ЭКРАН ═══════════════
+// Android/ПК: Fullscreen API. iPhone Safari его не поддерживает (запрет iOS) —
+// там показываем инструкцию «На экран Домой»: установленная иконка открывается без полосок.
+const fsBtn = $('fs'), docEl = document.documentElement;
+const reqFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+const exitFs = document.exitFullscreen || document.webkitExitFullscreen;
+const inFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const standalone = navigator.standalone === true || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches;
+if (standalone) fsBtn.hidden = true;
+fsBtn.addEventListener('click', async () => {
+  if (!reqFs){
+        showMsg(t('ios_help'), t('understood'));
+    return;
+  }
+  try {
+    if (inFs()) exitFs.call(document);
+    else { await reqFs.call(docEl); try { await screen.orientation.lock('landscape'); } catch(_){} }
+  } catch(_){}
+});
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => fsBtn.classList.toggle('on', inFs())));
+
+// ═══════════════ СТАРТ ═══════════════
+// Каждый заход начинается со стартовой страницы (баннер + выбор языка). Язык по умолчанию —
+// тот, что выбран раньше (или язык браузера); поменять его можно только здесь.
+document.querySelectorAll('.lang').forEach(b => b.onclick = () => { lang = b.dataset.lang; try { localStorage.setItem('world_lang', lang); } catch(_){} applyLang(); });
+applyLang(); setMode('reg');
+$('play').onclick = async () => {
+  try { localStorage.setItem('world_lang', lang); } catch(_){}
+  $('scrStart').hidden = true;
+  if (!token){ $('scrAuth').hidden = false; return; }
+  try {
+    const r = await api('me', null, true);
+    if (r.char) enterGame(); else showCreate();
+  } catch(e){
+    if (e.status === 401){ try { localStorage.removeItem('world_token'); } catch(_){} token = null; }
+    $('scrAuth').hidden = false;
+  }
+};
+// анимация стартового баннера: idle героев и 7 панков, звёзды
+(function(){
+  const start = document.getElementById('scrStart');
+  const PUNKS = ['enemy_punk','enemy_punk_v2_yellowgreen','enemy_punk_v3_green','enemy_punk_v4_teal','enemy_punk_v5_blue','enemy_punk_v6_purple','enemy_punk_v7_pink'];
+  const POS = [{l:5,s:.95,f:0},{l:17,s:.85,f:0},{l:31,s:.9,f:1},{l:50,s:.85,f:0},{l:69,s:.9,f:1},{l:83,s:.85,f:0},{l:95,s:.95,f:1}];
+  const punksEl = document.getElementById('bnPunks'), imgs = [];
+  PUNKS.forEach((dir, i) => {
+    const p = POS[i], img = document.createElement('img');
+    img.className = 'punk'; img.style.left = p.l + '%';
+    img.style.transform = 'translateX(-50%) scale(' + p.s + ')' + (p.f ? ' scaleX(-1)' : '');
+    img.dataset.base = 'streets_of_fight'; img.dataset.dir = dir; img.dataset.n = 4;
+    img.src = 'sprites/streets_of_fight/' + dir + '/Idle/idle1.png';
+    punksEl.appendChild(img); imgs.push({ img, i: 1, fps: 8 });
+  });
+  document.querySelectorAll('#bnFighters img').forEach(img => imgs.push({ img, i: 1, fps: 9 }));
+  const stars = document.getElementById('bnStars');
+  for (let i = 0; i < 40; i++){
+    const s = document.createElement('div'); s.className = 'star';
+    s.style.left = Math.random()*100 + '%'; s.style.top = Math.random()*55 + '%';
+    s.style.animationDelay = (Math.random()*2.4) + 's'; stars.appendChild(s);
+  }
+  // кадры грузим один раз в память (blob) — сервер отдаёт спрайты без кэша, иначе телефон скачивал бы их заново каждый кадр
+  imgs.forEach(o => {
+    const d = o.img.dataset, n = +d.n, urls = [];
+    for (let k = 1; k <= n; k++) urls.push('sprites/' + d.base + '/' + d.dir + '/Idle/idle' + k + '.png');
+    Promise.all(urls.map(u => fetch(u).then(r => r.blob()).then(bl => URL.createObjectURL(bl)))).then(fr => { o.frames = fr; }).catch(() => {});
+  });
+  const step = ts => {
+    if (start.hidden) return;
+    imgs.forEach(o => {
+      if (!o.frames) return;
+      const f = Math.floor(ts / (1000 / o.fps)) % o.frames.length;
+      if (f !== o.i){ o.i = f; o.img.src = o.frames[f]; }
+    });
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>
